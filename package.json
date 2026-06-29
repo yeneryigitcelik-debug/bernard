@@ -1,0 +1,55 @@
+{
+  "name": "bernard-mcp",
+  "version": "0.1.0",
+  "description": "Repo-committed, project-scoped AI memory for coding agents — zero API keys, zero embeddings, zero external services. CLI + MCP server.",
+  "type": "module",
+  "bin": {
+    "bernard": "bin/bernard.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "README.tr.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node test/smoke.js",
+    "start": "node bin/bernard.js",
+    "mcp": "node bin/bernard.js mcp"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-memory",
+    "agent-memory",
+    "claude",
+    "claude-code",
+    "cursor",
+    "llm",
+    "bm25",
+    "retrieval",
+    "knowledge-base",
+    "cli",
+    "context",
+    "git"
+  ],
+  "license": "MIT",
+  "author": "Yener Yiğit Çelik <yeneryigitcelik@gmail.com>",
+  "homepage": "https://github.com/yeneryigitcelik-debug/bernard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yeneryigitcelik-debug/bernard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yeneryigitcelik-debug/bernard/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.0"
+  }
+}
