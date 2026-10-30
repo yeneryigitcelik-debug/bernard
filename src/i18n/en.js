@@ -3,6 +3,45 @@
 // Keep this file and tr.js in sync, key-for-key.
 
 export const en = {
+  "doctor.layout.root_unreadable": "Cannot inspect root {path}: {error}",
+  "doctor.layout.unreadable": "Cannot read {path}: {error}",
+  "doctor.layout.missing_dir": "Memory is not initialized at {path}; run bernard init in the intended project root.",
+  "doctor.layout.missing_file": "Missing memory file: {file}.",
+  "doctor.layout.gitignore_cache": "The local .bernard/.cache directory is not explicitly ignored.",
+  "doctor.layout.gitattributes_union": "The records.jsonl merge=union Git attribute is missing.",
+  "doctor.layout.cache_tracked": "Derived cache files are tracked by Git.",
+  "doctor.records.invalid_utf8": "Line {lineNo} contains invalid UTF-8. Original bytes were preserved.",
+  "doctor.records.corrupt_json": "Line {lineNo} is not valid JSON.",
+  "doctor.records.schema_invalid": "Line {lineNo} fails record validation: {errors}",
+  "doctor.records.duplicate_id": "ID {id} occurs on lines {lineNos}. Invalid copies stay excluded; conflicting active copies are quarantined.",
+  "doctor.records.no_trailing_newline": "The last line has no terminating newline.",
+  "doctor.records.mixed_eol": "The file mixes LF and CRLF endings; existing bytes were preserved.",
+  "doctor.graph.superseded_by_missing": "Line {lineNo}: {id} points to missing record {by}.",
+  "doctor.graph.superseded_by_self": "Line {lineNo}: {id} supersedes itself.",
+  "doctor.graph.cycle": "Supersession cycle: {ids}",
+  "doctor.graph.valid_but_superseded": "Line {lineNo}: {id} has a replacement but is still marked valid.",
+  "doctor.config.unparseable": "config.json is not a valid settings object.",
+  "doctor.config.locale_unknown": "Unknown configured locale: {locale}",
+  "doctor.config.retrieval_range": "Invalid retrieval settings: {fields}",
+  "doctor.categories.unparseable": "categories.json is not a valid object.",
+  "doctor.categories.types_diverge": "Categories must contain each canonical record type exactly once.",
+  "doctor.categories.synonyms_shape": "Synonyms must map keys to arrays of strings.",
+  "doctor.cache.version_mismatch": "Cache format {actual} is obsolete; current format is {expected}.",
+  "doctor.cache.stale": "The search cache is absent or stale; doctor did not rebuild it.",
+  "doctor.lock.present": "A store lock exists at {path}; owner state: {state}. It was not removed.",
+  "doctor.lock.breaker_present": "A stale-lock breaker exists at {path}; it was not removed.",
+  "doctor.hook.state": "Post-commit hook state: {kind}",
+  "doctor.reconcile": "Inspect lines {lines}, reconcile their history manually, then run bernard doctor again. No automatic repair is performed.",
+  "doctor.summary": "{errors} errors, {warnings} warnings, {infos} infos; {records} valid rows, {unique_ids} unique IDs, {quarantined_ids} quarantined IDs.",
+
+  "store.duplicateLines": "Duplicate id \"{id}\" on lines {lines}; conflicting active copies are excluded from reads. Run bernard doctor and reconcile these lines manually.",
+  "store.ambiguousUpdate": "Cannot update conflicting copies of \"{id}\". Run bernard doctor, reconcile the reported lines manually, then retry. Original bytes are unchanged.",
+  "cli.flagNeedsValue": "Flag {flag} requires a non-empty value.",
+  "mcp.notInitialized": "Memory is not initialized at {dir}. Run bernard init in the intended project root before writing. No files were created.",
+  "add.notInitialized": "Memory settings are missing at {dir}; CLI add keeps its legacy auto-create behavior. Run bernard init to add config, categories and Git ignore/merge rules.",
+  "distill.ttyHint": "--apply requires an interactive terminal; no records were changed.",
+  "tags.unreadable": "Cannot safely edit/read {path}: {error}. Fix the file manually; existing categories were preserved.",
+
   // Storage validation and concurrency diagnostics.
   "store.invalidRecord": "Invalid record: {errors}",
   "store.invalidLine": "Skipping invalid record line: {line} ({errors})",
@@ -228,6 +267,7 @@ Commands:
   distill    (alias: damit)     Surface conflicts / supersession chains
   suggest    (alias: oner)      Draft records from recent commits
   install-hook (alias: kanca-kur)  Install/remove a post-commit reminder hook
+  doctor (doktor)              Read-only integrity check [--json]; exits 0 healthy, 1 warning, 2 error, 3 unavailable
   stats      (alias: istatistik)   Show a summary dashboard
   tags       (alias: etiketler)    Manage types / synonym groups
   mcp                           Start the MCP server (stdio)
@@ -256,6 +296,7 @@ Examples:
   bernard invalidate ber_abc123 --by ber_def456
   bernard distill --apply
   bernard suggest --add
+  bernard doctor --json
   bernard stats
   bernard tags --add "auth=login,session"
   bernard install-hook

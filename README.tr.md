@@ -158,7 +158,26 @@ bernard distill
 bernard distill --apply
 ```
 
-Olası çelişkileri (aynı tip + etiket grubunda birden çok kayıt), geçersiz zincirlerini ve önerileri gösterir. Her çelişki için **en yenisini tut, diğerlerini geçersiz kıl** önerir ve çalıştırmaya hazır `bernard invalidate … --by …` komutları üretir. `--apply` (TTY) bunları etkileşimli uygular. **Hiçbir şeyi silmez** — yalnızca işaretler ve önerir.
+Olası çelişkileri (aynı tip + boş olmayan etiket grubunda birden çok kayıt), geçersiz zincirlerini ve önerileri gösterir. Etiketsiz kayıtlar ve ayrı `bug` olayları çakışma önerilerinden hariç tutulur; ortak tür/etiket tek başına çelişki kanıtı değildir. Her çelişki için **en yenisini tut, diğerlerini geçersiz kıl** önerir ve çalıştırmaya hazır `bernard invalidate … --by …` komutları üretir. `--apply` (TTY) bunları etkileşimli uygular. **Hiçbir şeyi silmez** — yalnızca işaretler ve önerir.
+
+### Bütünlük kontrolü (salt okunur)
+
+```bash
+bernard doctor
+bernard doctor --json
+bernard doktor --locale tr
+```
+
+Kaynak satırlarını, yinelenen kimlikleri, geçersizleştirme bağlantılarını/döngülerini,
+ayarları, kategorileri, Git ignore/merge kurallarını, izlenen önbelleği, önbellek
+geçerliliğini, kilitleri ve kanca sahipliğini denetler. Kayıtları onarmaz; kilit almaz
+veya kaldırmaz; depo/önbellek oluşturmaz. JSON çıktısı `schema: 1`, `summary`, sabit
+İngilizce tanı `id` alanları, yerelleştirilmiş mesajlar, satır numaraları ve `exitCode`
+içerir. Çıkış kodları: **0** sağlıklı (yalnız bilgi), **1** uyarı, **2** veri/yapı
+hatası, **3** kök okunamıyor. `summary.records` geçerli fiziksel satırları sayar;
+`unique_ids` ve `quarantined_ids` tekrarları açıkça gösterir. Bildirilen yinelenen
+satırları inceleyip geçmişlerini elle uzlaştırın, ardından `doktor` komutunu yeniden
+çalıştırın. Otomatik onarım veya silme yapılmaz.
 
 ### İstatistik
 
@@ -282,6 +301,25 @@ bernard bilgiyi asla silmez; eskiyen kararları **geçersizleştirir** ve geçmi
 ```
 
 Her kayıt, ekleme-öncelikli bir dosyada bağımsız bir satır olduğundan, iki dal farklı kayıtlar eklediğinde git iki tarafı **birleştirir** (union) — böylece aynı anda hafızaya yazan takım üyeleri gereksiz merge çatışmaları yaşamaz.
+
+Bir dal satırı güncellerken diğer dal yakınına kayıt eklerse union merge aynı kimliği
+**birden fazla satırda** bırakabilir. Bernard bütün kaynak baytlarını korur ve satır
+numaralarını bildirir: aynı kopyalar bir kez sayılır; herhangi bir kopya geçersizse o
+kimlik aramada hariç kalır. Farklı kopyaların hepsi aktifse rastgele bir dalın içeriği
+seçilmez; kimlik **arama, liste, istatistik ve distill sonuçlarından karantinaya alınır**.
+CLI okumaları stderr'e uyarı yazar; MCP arama/liste yanıtları da tanıyı içerir.
+Çakışan kopyalar güncellenemez; diğer kayıtlar kullanılmaya devam eder. Aynı kopyalara
+açık bir yama her kopyayı kendi satır sonunu koruyarak günceller. `bernard doktor`
+çalıştırın ve yinelenen satırları elle uzlaştırın; okumalar dosyayı yeniden yazmaz.
+Önbellek biçimi 3, JSONL parmak izi değişmese de eski indeksleri geçersiz sayar.
+
+Okuma komutları eksik depoyu oluşturmaz. MCP yazmaları mevcut kayıt dosyası gerektirir;
+sunucuyu doğru proje kökünde başlatın ve önce orada `bernard init` çalıştırın. CLI `add`,
+ayarlar ve Git kuralları için `init` uyarısı vererek önceki otomatik oluşturma davranışını
+korur. `add --supersedes`, yeni kaydı ekleme ve eskiyi geçersizleştirme işlemlerini tek
+kilitli, atomik yazmayla yapar. `--by` olmadan tekrar geçersizleştirme mevcut yerine geçen
+kayıt bağlantısını korur. Distill, etiketsiz kayıtları ve ayrı `bug` olaylarını çakışma
+önerilerine dahil etmez; tür/etiket ortaklığı tek başına çelişki kanıtı değildir.
 
 ## Mimari: neyin commit edildiği, neyin yerel kaldığı
 

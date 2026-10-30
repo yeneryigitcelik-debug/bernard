@@ -30,10 +30,6 @@ function getVersion() {
   }
 }
 
-function resolveDir() {
-  return bernardDir(findRepoRoot());
-}
-
 // Read the synonym dictionary from categories.json (empty if missing).
 function readSynonyms(dir) {
   try {
@@ -88,8 +84,16 @@ function notFoundResult(id, t) {
   return { isError: true, content: [{ type: "text", text: t("mcp.notFound", { id }) }] };
 }
 
+function snapshotNotice(snapshot, t) {
+  return snapshot.duplicates.map((d) => t("store.duplicateLines", { id: d.id, lines: d.lineNos.join(", ") })).join("\n");
+}
+
 export async function startServer() {
-  const dir = resolveDir();
+  const root = findRepoRoot();
+  const dir = bernardDir(root);
+  const notInitialized = () => fs.existsSync(path.join(dir, "records.jsonl")) ? null : {
+    isError: true, content: [{ type: "text", text: getT(dir)("mcp.notInitialized", { dir }) }],
+  };
   const locale = resolveLocale({ config: localeFromConfig(dir) });
   const t = getT(dir);
 
@@ -124,10 +128,11 @@ export async function startServer() {
         locale,
       });
 
+      const notice = snapshotNotice(snap, t);
       if (!res.length) {
-        return { content: [{ type: "text", text: t("mcp.noResults") }] };
+        return { content: [{ type: "text", text: [t("mcp.noResults"), notice].filter(Boolean).join("\n\n") }] };
       }
-      const text = res.map(({ record, score }) => formatRecord(record, score, t)).join("\n\n");
+      const text = [res.map(({ record, score }) => formatRecord(record, score, t)).join("\n\n"), notice].filter(Boolean).join("\n\n");
       return { content: [{ type: "text", text }] };
     }
   );
@@ -145,6 +150,8 @@ export async function startServer() {
       },
     },
     async ({ type, title, content, tags }) => {
+      const missing = notInitialized();
+      if (missing) return missing;
       const candidate = {
         type,
         title,
@@ -182,15 +189,17 @@ export async function startServer() {
       },
     },
     async ({ type, tag }) => {
-      let records = readRecords(dir);
+      const snap = readSnapshot(dir);
+      let records = snap.records;
+      const notice = snapshotNotice(snap, t);
       if (type) records = records.filter((r) => r.type === type);
       if (tag) records = records.filter((r) => Array.isArray(r.tags) && r.tags.includes(tag));
       records.sort((a, b) => (Date.parse(b.created) || 0) - (Date.parse(a.created) || 0));
 
       if (!records.length) {
-        return { content: [{ type: "text", text: t("mcp.noRecords") }] };
+        return { content: [{ type: "text", text: [t("mcp.noRecords"), notice].filter(Boolean).join("\n\n") }] };
       }
-      const text = records.map((r) => formatRecord(r, undefined, t)).join("\n\n");
+      const text = [records.map((r) => formatRecord(r, undefined, t)).join("\n\n"), notice].filter(Boolean).join("\n\n");
       return { content: [{ type: "text", text }] };
     }
   );
@@ -206,9 +215,11 @@ export async function startServer() {
       },
     },
     async ({ id, by }) => {
+      const missing = notInitialized();
+      if (missing) return missing;
       let rec;
       try {
-        rec = updateRecord(dir, id, { invalid: true, superseded_by: by || null });
+        rec = updateRecord(dir, id, { invalid: true, ...(by !== undefined ? { superseded_by: by } : {}) });
       } catch (err) {
         return invalidRecordResult(err, t);
       }
@@ -238,6 +249,8 @@ export async function startServer() {
       },
     },
     async ({ id, type, title, content, tags }) => {
+      const missing = notInitialized();
+      if (missing) return missing;
       const patch = {};
       if (type !== undefined) patch.type = type;
       if (title !== undefined) patch.title = title;
@@ -267,7 +280,6 @@ export async function startServer() {
       inputSchema: { n: z.number().optional() },
     },
     async ({ n }) => {
-      const root = findRepoRoot();
       if (!isGitRepo(root)) {
         return { content: [{ type: "text", text: t("mcp.notGitRepo") }] };
       }

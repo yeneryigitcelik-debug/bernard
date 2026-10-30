@@ -6,7 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Read-only `doctor` / `doktor` integrity reports with bilingual messages, stable JSON diagnostics and documented exit codes; no automatic repair.
+
 ### Fixed
+
+- Prevent union-merge duplicate IDs from resurrecting invalid records; quarantine conflicting active copies, report their lines and retain every source segment. Bump derived cache format to 3.
+- Preserve supersession provenance on invalidation retries; make `add --supersedes` one atomic transaction.
+- Keep uninitialized reads free of writes and reject MCP writes without a memory store.
+- Refuse destructive category fallbacks and serialize atomic synonym edits.
+- Limit distill proposals to tagged non-bug cohorts and compare timestamps chronologically.
+- Parse Git commit metadata separately from NUL-delimited file lists, preserving merge/empty commit bodies and marking truncated diffs.
 
 - Serialize local record writers and atomically replace JSONL to preserve concurrent additions and updates; retain malformed source lines for manual repair.
 - Validate full MCP record updates and skip malformed records during retrieval.

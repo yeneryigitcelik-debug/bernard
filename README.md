@@ -139,7 +139,7 @@ bernard invalidate ber_abc123
 bernard invalidate ber_abc123 --by ber_def456
 ```
 
-Marks a record invalid **without deleting it** (`invalid: true`). `--by` links the record that replaces it, preserving the decision history. Search drops invalid records by default.
+Marks a record invalid **without deleting it** (`invalid: true`). `--by` links the record that replaces it, preserving the decision history. Search drops invalid records by default. Retrying invalidation without `--by` preserves any existing replacement link.
 
 To record a new decision that directly supersedes an old one:
 
@@ -156,7 +156,25 @@ bernard distill
 bernard distill --apply
 ```
 
-Surfaces possible conflicts (multiple records with the same type + tags), supersession chains, and suggestions. For each conflict it proposes **keep the newest, invalidate the rest** and prints ready-to-run `bernard invalidate … --by …` commands. `--apply` (TTY) applies them interactively. **It never deletes anything** — it only marks and suggests.
+Surfaces possible conflicts (multiple tagged records with the same type + tags), supersession chains, and suggestions. Untagged records and separate `bug` events are excluded from conflict proposals; sharing a type or tag is not proof of contradiction. For each conflict it proposes **keep the newest, invalidate the rest** and prints ready-to-run `bernard invalidate … --by …` commands. `--apply` (TTY) applies them interactively. **It never deletes anything** — it only marks and suggests.
+
+### Check integrity (read-only)
+
+```bash
+bernard doctor
+bernard doctor --json
+bernard doktor --locale tr
+```
+
+Checks source lines, duplicate IDs, supersession links/cycles, settings, categories,
+Git ignore/merge rules, tracked caches, cache freshness, locks and hook ownership.
+It never repairs records, acquires/removes a lock, creates a store or rebuilds a cache.
+JSON output has `schema: 1`, a `summary`, stable English diagnostic `id`s, localized
+messages, line numbers and an `exitCode`. Exit status: **0** healthy (information only),
+**1** warnings, **2** data/layout errors, **3** root unavailable. `summary.records`
+counts valid physical rows; `unique_ids` and `quarantined_ids` make duplicates explicit.
+For a duplicate, inspect the reported lines and reconcile the history manually, then
+run `doctor` again. There is no automatic repair or deletion.
 
 ### Stats
 
@@ -281,6 +299,19 @@ bernard never deletes knowledge; it **invalidates** stale decisions and preserve
 
 Because each record is an independent line in an append-mostly file, git **unions** both sides when two branches add different records — so teammates writing to memory at the same time don't hit needless merge conflicts.
 
+Updating a line on one branch while another branch appends nearby can also produce
+**duplicate IDs**. Bernard keeps all source bytes and reports their line numbers:
+identical copies count once; if any copy is invalid, the ID stays excluded from search.
+When different copies are all active, that ID is **quarantined from search, list,
+stats and distill** rather than choosing a branch's content arbitrarily. CLI reads
+warn on stderr; MCP search/list include the diagnostic in the tool response.
+Updates to conflicting copies fail with an actionable `doctor` hint; unrelated
+records remain usable. An explicit patch to identical copies updates each copy while
+preserving its line ending. Run `bernard doctor` and reconcile duplicate lines by hand;
+no read silently rewrites or removes them. Search cache format 3 invalidates older
+indexes even when the JSONL fingerprint is unchanged.
+
+
 ## Architecture: what's committed, what's local
 
 ```
@@ -299,7 +330,9 @@ your-project/
 
 **Committed:** `records.jsonl`, `categories.json`, `config.json`. Memory is code — it should be shared, reviewed, and versioned with git history.
 
-**Local writes:** CLI and MCP writers in the same working copy share a lock and replace JSONL atomically. Concurrent writers wait for a bounded interval; an active lock is never stolen. This does not coordinate separate computers or resolve Git merge conflicts. Malformed or invalid rows are skipped for retrieval and preserved on disk for manual repair.
+**Initialization:** Read commands do not create missing stores. MCP writes require an existing records file; launch the server in the intended project root and run `bernard init` there first. CLI `add` retains its older auto-create behavior with a warning to run `init` for configuration and Git rules.
+
+**Local writes:** CLI and MCP writers in the same working copy share a lock and replace JSONL atomically. A CLI `add --supersedes` appends the replacement and invalidates the old record in one locked, atomic write. Concurrent writers wait for a bounded interval; an active lock is never stolen. This does not coordinate separate computers or resolve Git merge conflicts. Malformed or invalid rows are skipped for retrieval and preserved on disk for manual repair.
 
 **Local:** `.bernard/.cache/`. The BM25 `index.json` is fully derivable from `records.jsonl` (rebuilt automatically when the records change, or when the locale changes). Committing derived data would only create meaningless conflicts.
 

@@ -26,7 +26,7 @@ export const legacyHook = (r) =>
 const errMsg = (e) => (e && e.message ? e.message : String(e));
 const count = (s, sub) => s.split(sub).length - 1;
 
-function classify(content, current) {
+export function classify(content, current) {
   const legacy = [makeT("en")("hook.reminder"), makeT("tr")("hook.reminder")];
   const known = [...new Set([current, ...legacy])];
   if (legacy.some((r) => content === legacyHook(r))) return { kind: "legacy" };

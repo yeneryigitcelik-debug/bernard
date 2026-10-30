@@ -14,9 +14,10 @@ export function distill(records) {
   // Group non-invalid records by type + sorted tags.
   const groups = new Map();
   for (const rec of list) {
-    if (!rec || rec.invalid) continue;
+    if (!rec || rec.invalid || rec.type === "bug") continue;
     const tags = Array.isArray(rec.tags) ? rec.tags : [];
-    const key = `${rec.type}|${[...tags].sort().join(",")}`;
+    if (!tags.length) continue; // Sharing a type alone does not imply a conflict.
+    const key = JSON.stringify([rec.type, [...tags].sort()]);
     if (!groups.has(key)) {
       groups.set(key, { type: rec.type, tags: [...tags].sort(), ids: [] });
     }
@@ -34,7 +35,8 @@ export function distill(records) {
         const b = byId.get(keep);
         const ta = a && a.created ? a.created : "";
         const tb = b && b.created ? b.created : "";
-        if (ta > tb) keep = id;
+        const da = Date.parse(ta), db = Date.parse(tb);
+        if (Number.isFinite(da) && Number.isFinite(db) ? da > db : ta > tb) keep = id;
       }
       const toInvalidate = g.ids.filter((id) => id !== keep);
       conflicts.push({ type: g.type, tags: g.tags, ids: g.ids, keep, toInvalidate });

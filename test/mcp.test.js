@@ -230,6 +230,10 @@ test("bernard MCP server over real stdio", { timeout: 15000 }, async () => {
     const invA = readRecordsFile(tmp).find((r) => r.id === idA);
     assert.equal(invA.invalid, true);
     assert.equal(invA.superseded_by, idB);
+    const retry = await call("bernard_invalidate", { id: idA });
+    assert.notEqual(retry.isError, true, textOf(retry));
+    assert.equal(readRecordsFile(tmp).find((r) => r.id === idA).superseded_by, idB, "retry preserves chain");
+
 
     // Cyclic: B superseded by A rejected
     before = readBytes(tmp);
@@ -273,5 +277,42 @@ test("bernard MCP server over real stdio", { timeout: 15000 }, async () => {
     try {
       fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     } catch {}
+  }
+});
+
+
+test("MCP missing-store writes fail without creating files, and duplicate diagnostics are visible to clients", { timeout: 15000 }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bernard-mcp-missing-"));
+  const env = { ...makeEnv(tmp), BERNARD_LOCK_TIMEOUT_MS: "50" };
+  let client, transport;
+  try {
+    spawnSync("git", ["init", "-q"], { cwd: tmp, env, stdio: "ignore" });
+    transport = new StdioClientTransport({ command: process.execPath, args: [BIN, "mcp"], cwd: tmp, env, stderr: "pipe" });
+    transport.stderr?.on("data", () => {});
+    client = new Client({ name: "bernard-missing-test", version: "0.0.0" });
+    await client.connect(transport);
+    const call = (name, args) => client.callTool({ name, arguments: args });
+    for (const [name,args] of [["bernard_add",{type:"note",title:"fixture",content:"test"}],["bernard_update",{id:"a",content:"test"}],["bernard_invalidate",{id:"a"}]]) {
+      const result = await call(name,args); assert.equal(result.isError,true); assert.match(textOf(result),/init/);
+      assert.equal(fs.existsSync(path.join(tmp,".bernard")),false);
+    }
+    assert.match(textOf(await call("bernard_search",{query:"fixture"})),/No results/);
+    assert.match(textOf(await call("bernard_list",{})),/No records/);
+    assert.equal(fs.existsSync(path.join(tmp,".bernard")),false);
+    const initialized = spawnSync(process.execPath,[BIN,"init"],{cwd:tmp,env,encoding:"utf8"}); assert.equal(initialized.status,0);
+    const store=path.join(tmp,".bernard"), file=path.join(store,"records.jsonl");
+    const row={id:"dup",type:"note",title:"fixture",content:"one",tags:[],created:"2024-01-01T00:00:00Z",invalid:false,superseded_by:null,source:"manual"};
+    const raw=JSON.stringify(row)+"\n"+JSON.stringify({...row,content:"other branch"})+"\n";
+    fs.writeFileSync(file,raw);
+    for (const [name,args] of [["bernard_search",{query:"fixture"}],["bernard_list",{}]]) assert.match(textOf(await call(name,args)),/doctor/);
+    const update=await call("bernard_update",{id:"dup",content:"overwrite"});assert.equal(update.isError,true);assert.match(textOf(update),/doctor/);assert.equal(fs.readFileSync(file,"utf8"),raw);
+    const {acquireStoreLock,releaseStoreLock}=await import("../src/core/store.js");const lock=acquireStoreLock(store);
+    try {const blocked=await call("bernard_add",{type:"note",title:"blocked",content:"fixture"});assert.equal(blocked.isError,true);assert.match(textOf(blocked),/lock/);}
+    finally {releaseStoreLock(lock);}
+    const recovered=await call("bernard_add",{type:"note",title:"after timeout",content:"fixture"});assert.notEqual(recovered.isError,true,textOf(recovered));
+  } finally {
+    try {await client?.close();} catch {}
+    try {await transport?.close();} catch {}
+    fs.rmSync(tmp,{recursive:true,force:true,maxRetries:3,retryDelay:100});
   }
 });

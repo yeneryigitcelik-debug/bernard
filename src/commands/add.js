@@ -1,5 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
 import readline from "node:readline";
-import { appendRecord, updateRecord, readRecords } from "../core/store.js";
+import { appendRecord, appendSuperseding, readRecords } from "../core/store.js";
 import { findRepoRoot, bernardDir } from "../core/paths.js";
 import { validateRecord, normalizeTags, TYPES } from "../util/schema.js";
 import { log } from "../util/log.js";
@@ -95,12 +97,12 @@ export async function add(parsed) {
     return;
   }
 
-  const rec = appendRecord(dir, candidate);
+  if (!fs.existsSync(path.join(dir, "config.json"))) log.warn(t("add.notInitialized", { dir }));
+  const rec = oldId ? appendSuperseding(dir, candidate, oldId) : appendRecord(dir, candidate);
   const tagStr = rec.tags.length ? ` [${rec.tags.join(", ")}]` : "";
   console.log(t("add.added", { id: rec.id, type: rec.type, title: rec.title, tags: tagStr }));
 
   if (oldId) {
-    const old = updateRecord(dir, oldId, { invalid: true, superseded_by: rec.id });
-    if (old) console.log(t("add.superseded", { old: old.id, new: rec.id }));
+    console.log(t("add.superseded", { old: oldId, new: rec.id }));
   }
 }

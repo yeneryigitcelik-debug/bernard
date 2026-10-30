@@ -9,7 +9,8 @@ import { getT, resolveLocale, localeFromConfig } from "../i18n/index.js";
 
 function readJsonSafe(file, fallback) {
   try {
-    return JSON.parse(fs.readFileSync(file, "utf8"));
+    const data = JSON.parse(fs.readFileSync(file, "utf8"));
+    return data && typeof data === "object" && !Array.isArray(data) ? data : fallback;
   } catch {
     return fallback;
   }

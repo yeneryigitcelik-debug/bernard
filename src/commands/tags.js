@@ -9,33 +9,34 @@ import path from "node:path";
 import { findRepoRoot, bernardDir } from "../core/paths.js";
 import { log } from "../util/log.js";
 import { getT } from "../i18n/index.js";
+import { TYPES } from "../util/schema.js";
+import { withStoreLock, writeFileAtomic } from "../core/store.js";
 
 function categoriesPath(dir) {
   return path.join(dir, "categories.json");
 }
 
 function readCategories(p) {
-  let data = { types: [], synonyms: {} };
-  if (fs.existsSync(p)) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(p, "utf8"));
-      if (raw && typeof raw === "object") {
-        data.types = Array.isArray(raw.types) ? raw.types : [];
-        data.synonyms =
-          raw.synonyms && typeof raw.synonyms === "object" ? raw.synonyms : {};
-      }
-    } catch {
-      // unreadable -> treated as empty
-    }
+  let raw;
+  try { raw = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(fs.readFileSync(p))); }
+  catch (error) {
+    if (error.code === "ENOENT") return { types: [...TYPES], synonyms: {} };
+    throw error;
   }
-  return data;
+  const object = (value) => value && typeof value === "object" && !Array.isArray(value);
+  if (!object(raw) || !Array.isArray(raw.types) || !raw.types.every((v) => typeof v === "string") ||
+      !object(raw.synonyms) || !Object.values(raw.synonyms).every((values) =>
+        Array.isArray(values) && values.every((v) => typeof v === "string"))) {
+    throw new Error("Invalid categories shape");
+  }
+  return raw; // Preserve unknown fields, never silently replace damaged data.
 }
 
 function writeCategories(p, data) {
-  fs.writeFileSync(p, JSON.stringify(data, null, 2) + "\n", "utf8");
+  writeFileAtomic(p, JSON.stringify(data, null, 2) + "\n");
 }
 
-export async function tags(parsed) {
+async function runTags(parsed) {
   const flags = parsed.flags || {};
   const dir = bernardDir(findRepoRoot());
   const t = getT(dir);
@@ -62,14 +63,14 @@ export async function tags(parsed) {
       return;
     }
 
-    const data = readCategories(p);
-    const existing = Array.isArray(data.synonyms[key]) ? data.synonyms[key] : [];
-    const merged = [];
-    for (const s of [...existing, ...syns]) {
-      if (!merged.includes(s)) merged.push(s);
-    }
-    data.synonyms[key] = merged;
-    writeCategories(p, data);
+    const merged = withStoreLock(dir, () => {
+      const data = readCategories(p);
+      const existing = Object.hasOwn(data.synonyms, key) ? data.synonyms[key] : [];
+      const merged = [...new Set([...existing, ...syns])];
+      Object.defineProperty(data.synonyms, key, { value: merged, enumerable: true, writable: true, configurable: true });
+      writeCategories(p, data);
+      return merged;
+    });
 
     console.log(t("tags.groupUpdated", { key, syns: merged.join(", ") }));
     log.success(t("tags.success"));
@@ -84,10 +85,14 @@ export async function tags(parsed) {
       return;
     }
     const key = flags.remove.trim();
-    const data = readCategories(p);
-    if (Object.prototype.hasOwnProperty.call(data.synonyms, key)) {
+    const removed = withStoreLock(dir, () => {
+      const data = readCategories(p);
+      if (!Object.hasOwn(data.synonyms, key)) return false;
       delete data.synonyms[key];
       writeCategories(p, data);
+      return true;
+    });
+    if (removed) {
       console.log(t("tags.groupRemoved", { key }));
       log.success(t("tags.success"));
     } else {
@@ -113,5 +118,14 @@ export async function tags(parsed) {
     }
   } else {
     console.log(`  ${t("tags.noSynonyms")}`);
+  }
+}
+
+export async function tags(parsed) {
+  try { return await runTags(parsed); }
+  catch (error) {
+    const dir = bernardDir(findRepoRoot());
+    log.error(getT(dir)("tags.unreadable", { path: categoriesPath(dir), error: error.message }));
+    process.exitCode = 1;
   }
 }

@@ -95,17 +95,19 @@ function eolOf(seg) {
   return "";
 }
 
-// Every segment keeps its original bytes in `seg`, whatever its validity.
-function parseBuffer(buf, t, warn) {
+// Every segment keeps its original bytes. Canonical reads never resurrect an
+// invalidated ID. Conflicting active copies are quarantined, not guessed at.
+export function parseLines(buf, t = getT(null), warn = false) {
   const lines = [];
-  const records = [];
+  const groups = new Map();
   for (const seg of splitSegments(buf)) {
-    const entry = { seg, rec: null };
+    const entry = { lineNo: lines.length + 1, seg, rec: null, error: null };
     lines.push(entry);
     let text;
     try {
       text = UTF8.decode(seg).trim();
     } catch {
+      entry.error = { id: "records.invalid_utf8", errors: [] };
       if (warn) log.warn(t("store.invalidUtf8", { bytes: seg.length }));
       continue;
     }
@@ -114,34 +116,58 @@ function parseBuffer(buf, t, warn) {
     try {
       value = JSON.parse(text);
     } catch {
-      // One bad line must never bring down the whole memory.
+      entry.error = { id: "records.corrupt_json", errors: [] };
       if (warn) log.warn(t("common.corruptLine", { line: text.slice(0, 80) }));
       continue;
     }
     const v = validateStoredRecord(value, t);
     if (!v.ok) {
-      if (warn) {
-        log.warn(t("store.invalidLine", { line: text.slice(0, 80), errors: v.errors.join("; ") }));
-      }
+      entry.error = { id: "records.schema_invalid", errors: v.errors };
+      if (warn) log.warn(t("store.invalidLine", { line: text.slice(0, 80), errors: v.errors.join("; ") }));
       continue;
     }
     entry.rec = value;
-    records.push(value);
+    if (!groups.has(value.id)) groups.set(value.id, []);
+    groups.get(value.id).push(entry);
   }
-  return { lines, records };
+  const records = [];
+  const duplicates = [];
+  for (const [id, entries] of groups) {
+    // Compare parsed values, independent of JSON whitespace and key order.
+    const same = entries.every((e) => equivalent(e.rec, entries[0].rec));
+    const invalid = entries.filter((e) => e.rec.invalid);
+    const quarantined = entries.length > 1 && !same && invalid.length === 0;
+    if (entries.length > 1) {
+      const duplicate = { id, lineNos: entries.map((e) => e.lineNo), identical: same, quarantined };
+      duplicates.push(duplicate);
+      if (warn) log.warn(t("store.duplicateLines", { id, lines: duplicate.lineNos.join(", ") }));
+    }
+    if (quarantined) continue;
+    // Prefer explicit invalidation provenance; doctor still reports every copy.
+    const linked = invalid.filter((e) => typeof e.rec.superseded_by === "string");
+    const candidates = linked.length ? linked : invalid.length ? invalid : entries;
+    records.push(candidates[candidates.length - 1].rec);
+  }
+  return { lines, records, duplicates };
+}
+
+function equivalent(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && equivalent(a[key], b[key]));
 }
 
 export function readRecords(dir) {
-  return parseBuffer(readRawRecords(dir), getT(dir), true).records;
+  return parseLines(readRawRecords(dir), getT(dir), true).records;
 }
 
-// Records plus the fingerprint of the exact bytes they were parsed from.
+// Records and diagnostics from exactly the fingerprinted bytes.
 export function readSnapshot(dir) {
   const buf = readRawRecords(dir);
-  return {
-    records: parseBuffer(buf, getT(dir), false).records,
-    fingerprint: fingerprintBuffer(buf),
-  };
+  const parsed = parseLines(buf, getT(dir), true);
+  return { ...parsed, fingerprint: fingerprintBuffer(buf) };
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +244,7 @@ function createExclusive(p, content, tmpDir) {
   }
 }
 
-function readOwner(p) {
+export function readOwner(p) {
   let raw;
   try {
     raw = fs.readFileSync(p, "utf8");
@@ -241,7 +267,7 @@ function readOwner(p) {
   return { state: "garbled", raw };
 }
 
-function isOwnerDead(owner) {
+export function isOwnerDead(owner) {
   // We cannot probe processes on other hosts: never steal those.
   if (owner.host !== os.hostname()) return false;
   if (owner.pid === process.pid) return false;
@@ -450,15 +476,20 @@ export function writeFileAtomic(target, data, opts = {}) {
 function supersessionErrors(records, id, by, t) {
   if (by === id) return [t("store.supersedeSelf", { id })];
   const byId = new Map();
-  for (const r of records) if (!byId.has(r.id)) byId.set(r.id, r);
+  for (const r of records) {
+    if (!byId.has(r.id)) byId.set(r.id, []);
+    byId.get(r.id).push(r);
+  }
   if (!byId.has(by)) return [t("store.supersedeMissing", { id: by })];
+  // Inspect all physical copies' edges, not only the canonical read view.
   const seen = new Set();
-  let cur = by;
-  while (cur != null && !seen.has(cur)) {
+  const pending = [by];
+  while (pending.length) {
+    const cur = pending.pop();
     if (cur === id) return [t("store.supersedeCycle", { id, by })];
+    if (seen.has(cur)) continue;
     seen.add(cur);
-    const r = byId.get(cur);
-    cur = r ? r.superseded_by : null;
+    for (const r of byId.get(cur) || []) if (r.superseded_by != null) pending.push(r.superseded_by);
   }
   return [];
 }
@@ -493,22 +524,43 @@ export function appendRecord(dir, record, opts = {}) {
     dir,
     () => {
       const buf = readRawRecords(dir);
-      const { records } = parseBuffer(buf, t, false);
+      const { lines, records, duplicates } = parseLines(buf, t, false);
       const errors = [];
-      if (records.some((r) => r.id === rec.id)) errors.push(t("store.duplicateId", { id: rec.id }));
+      if (lines.some((l) => l.rec && l.rec.id === rec.id)) errors.push(t("store.duplicateId", { id: rec.id }));
       if (typeof rec.superseded_by === "string") {
-        errors.push(...supersessionErrors(records, rec.id, rec.superseded_by, t));
+        if (duplicates.some((d) => d.id === rec.superseded_by && !d.identical)) errors.push(t("store.ambiguousUpdate", { id: rec.superseded_by }));
+        errors.push(...supersessionErrors(lines.filter((l) => l.rec).map((l) => l.rec), rec.id, rec.superseded_by, t));
+      }
+      let content = buf;
+      if (opts.supersedes !== undefined) {
+        const oldId = opts.supersedes;
+        const old = records.find((r) => r.id === oldId);
+        if (!old) errors.push(t("store.supersedeMissing", { id: oldId }));
+        if (duplicates.some((d) => d.id === oldId && !d.identical)) errors.push(t("store.ambiguousUpdate", { id: oldId }));
+        errors.push(...supersessionErrors([...lines.filter((l) => l.rec).map((l) => l.rec), rec], oldId, rec.id, t));
+        if (old && !errors.length) {
+          const updated = { ...old, invalid: true, superseded_by: rec.id };
+          content = Buffer.concat(lines.map((l) => l.rec && l.rec.id === oldId
+            ? Buffer.from(JSON.stringify(updated) + eolOf(l.seg), "utf8") : l.seg));
+        }
       }
       if (errors.length) throw invalidRecordError(t, errors);
-      // Never glue a new object onto an unterminated last line.
-      const prefix = buf.length && buf[buf.length - 1] !== 0x0a ? "\n" : "";
-      writeFileAtomic(recordsPath(dir), Buffer.concat([buf, Buffer.from(prefix + line, "utf8")]), {
+      // Append and optional supersession are one atomic transaction.
+      const prefix = content.length && content[content.length - 1] !== 0x0a ? "\n" : "";
+      writeFileAtomic(recordsPath(dir), Buffer.concat([content, Buffer.from(prefix + line, "utf8")]), {
         tmpDir: storeCacheDir(dir),
       });
     },
     opts
   );
   return rec;
+}
+
+export function appendSuperseding(dir, record, oldId, opts = {}) {
+  if (typeof oldId !== "string" || !oldId.trim()) {
+    throw invalidRecordError(getT(dir), [getT(dir)("store.supersedeMissing", { id: oldId })]);
+  }
+  return appendRecord(dir, record, { ...opts, supersedes: oldId });
 }
 
 // Update a record in place. Unrelated lines (including malformed ones) keep
@@ -532,10 +584,12 @@ export function updateRecord(dir, id, patch, opts = {}) {
     () => {
       const file = recordsPath(dir);
       const buf = readRawRecords(dir);
-      const { lines, records } = parseBuffer(buf, t, false);
-      const idx = lines.findIndex((l) => l.rec && l.rec.id === id);
-      if (idx === -1) return null;
-      const current = lines[idx].rec;
+      const { lines, records, duplicates } = parseLines(buf, t, false);
+      if (duplicates.some((d) => d.id === id && !d.identical)) {
+        throw invalidRecordError(t, [t("store.ambiguousUpdate", { id })]);
+      }
+      const current = records.find((r) => r.id === id);
+      if (!current) return null;
       const candidate = { ...current };
       for (const k of Object.keys(clean)) defineField(candidate, k, clean[k]);
 
@@ -548,13 +602,13 @@ export function updateRecord(dir, id, patch, opts = {}) {
         typeof clean.superseded_by === "string" &&
         clean.superseded_by !== current.superseded_by
       ) {
-        errors.push(...supersessionErrors(records, id, clean.superseded_by, t));
+        if (duplicates.some((d) => d.id === clean.superseded_by && !d.identical)) errors.push(t("store.ambiguousUpdate", { id: clean.superseded_by }));
+        errors.push(...supersessionErrors(lines.filter((l) => l.rec).map((l) => l.rec), id, clean.superseded_by, t));
       }
       if (errors.length) throw invalidRecordError(t, errors);
 
-      const eol = eolOf(lines[idx].seg);
-      const parts = lines.map((l, i) =>
-        i === idx ? Buffer.from(JSON.stringify(candidate) + eol, "utf8") : l.seg
+      const parts = lines.map((l) =>
+        l.rec && l.rec.id === id ? Buffer.from(JSON.stringify(candidate) + eolOf(l.seg), "utf8") : l.seg
       );
       writeFileAtomic(file, Buffer.concat(parts), { tmpDir: storeCacheDir(dir) });
       return candidate;

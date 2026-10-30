@@ -30,6 +30,8 @@ const ROUTES = {
   istatistik: ["../src/commands/stats.js", "stats"],
   tags: ["../src/commands/tags.js", "tags"],
   etiketler: ["../src/commands/tags.js", "tags"],
+  doctor: ["../src/commands/doctor.js", "doctor"],
+  doktor: ["../src/commands/doctor.js", "doctor"],
   mcp: ["../src/mcp/server.js", "startServer"],
 };
 

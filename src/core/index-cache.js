@@ -11,7 +11,7 @@ import {
 import { log } from "../util/log.js";
 import { getT } from "../i18n/index.js";
 
-export const INDEX_VERSION = 2;
+export const INDEX_VERSION = 3;
 
 export function cacheDir(dir) {
   return path.join(dir, ".cache");
@@ -37,7 +37,7 @@ function isPosInt(v) {
   return Number.isSafeInteger(v) && v > 0;
 }
 
-// Checks shape plus internal numeric consistency. Duplicate doc ids are allowed.
+// Checks canonical unique IDs plus internal numeric consistency.
 export function isValidIndex(idx) {
   if (!isObj(idx)) return false;
   const { N, avgdl, df, docs } = idx;
@@ -45,11 +45,14 @@ export function isValidIndex(idx) {
   if (!Number.isFinite(avgdl) || avgdl < 0) return false;
   if (!isObj(df) || !Array.isArray(docs) || docs.length !== N) return false;
   const counts = new Map();
+  const ids = new Set();
   let total = 0;
   for (const d of docs) {
     if (!isObj(d) || typeof d.id !== "string" || !Number.isSafeInteger(d.len) || d.len < 0 || !isObj(d.tf)) {
       return false;
     }
+    if (ids.has(d.id)) return false;
+    ids.add(d.id);
     let sum = 0;
     for (const k of Object.keys(d.tf)) {
       const v = d.tf[k];
@@ -103,6 +106,8 @@ function buildFromSnapshot(dir, snap, locale) {
   // The fingerprint is of the very bytes that were indexed, so a concurrent
   // mutation can never be masked by this cache.
   index.source = { fingerprint: snap.fingerprint };
+  // A read in an uninitialized directory must not create a store/cache.
+  if (!fs.existsSync(recordsPath(dir))) return index;
   try {
     writeFileAtomic(indexPath(dir), JSON.stringify(index), { tmpDir: cacheDir(dir) });
   } catch (e) {

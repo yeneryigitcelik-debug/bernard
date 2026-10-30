@@ -88,6 +88,7 @@ export async function distillCmd(parsed) {
   const applyRequested = parsed?.flags?.apply;
   const applicable = conflicts.filter((c) => c.keep && c.toInvalidate.length > 0);
 
+  if (applyRequested && !process.stdin.isTTY) console.log(t("distill.ttyHint"));
   if (!applyRequested || !process.stdin.isTTY) {
     if (applicable.length) {
       console.log("");
