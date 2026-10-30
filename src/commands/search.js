@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { findRepoRoot, bernardDir } from "../core/paths.js";
-import { readRecords } from "../core/store.js";
+import { readSnapshot } from "../core/store.js";
 import { ensureIndex } from "../core/index-cache.js";
 import { retrieve } from "../core/retrieve.js";
 import { log } from "../util/log.js";
@@ -60,15 +60,17 @@ export async function search(parsed) {
       ? flags.tags
       : null;
 
-  // Refresh the index (mtime/locale-based) and pass the full-corpus index in.
+  // Take one snapshot so record bodies and the index come from the same bytes;
+  // the index is refreshed by fingerprint/locale and passed in.
+  const snap = readSnapshot(dir);
+  const records = snap.records;
   let idx = null;
   try {
-    idx = ensureIndex(dir, locale);
+    idx = ensureIndex(dir, locale, snap);
   } catch (e) {
     log.warn(t("search.indexFailed", { error: e.message }));
   }
 
-  const records = readRecords(dir);
   const res = retrieve(query, records, {
     index: idx,
     synonyms,

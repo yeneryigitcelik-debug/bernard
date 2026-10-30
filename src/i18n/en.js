@@ -3,6 +3,28 @@
 // Keep this file and tr.js in sync, key-for-key.
 
 export const en = {
+  // Storage validation and concurrency diagnostics.
+  "store.invalidRecord": "Invalid record: {errors}",
+  "store.invalidLine": "Skipping invalid record line: {line} ({errors})",
+  "store.invalidUtf8": "Skipping line with invalid UTF-8 ({bytes} bytes); original bytes are preserved.",
+  "store.duplicateId": "A record with id \"{id}\" already exists.",
+  "store.patchNotObject": "Patch must be an object.",
+  "store.idImmutable": "The record id cannot be changed.",
+  "store.supersedeSelf": "Record \"{id}\" cannot supersede itself.",
+  "store.supersedeMissing": "Superseding record \"{id}\" does not exist.",
+  "store.supersedeCycle": "Superseding \"{id}\" with \"{by}\" would create a cycle.",
+  "store.lockOwnerUnknown": "unknown owner",
+  "store.lockTimeout": "Timed out after {ms} ms waiting for store lock {path} (held by {owner}).",
+  "store.lockGarbled": "Timed out after {ms} ms: lock file {path} has unreadable content and no identifiable owner. If no bernard process is running, delete {path} manually.",
+  "store.lockBreakerStuck": "Timed out after {ms} ms: stale-lock breaker {path} exists (held by {owner}). It is never removed automatically. If no bernard process is running, delete {path} (and {lock} if its owner is dead) manually.",
+  "store.lockLost": "Store lock {path} was no longer ours at release time.",
+  "schema.idRequired": "Id is required and must be a non-empty string.",
+  "schema.createdInvalid": "Created must be a valid date string.",
+  "schema.invalidBoolean": "Invalid must be a boolean.",
+  "schema.supersededByInvalid": "superseded_by must be null or a non-empty string.",
+  "schema.sourceString": "Source must be a string.",
+  "store.indexWriteFailed": "Could not write the local search index: {error}",
+
   // --- common ---
   "common.noGitRepo": "Git repository not found; using the current directory.",
   "common.corruptLine": "Skipped corrupt line: {line}",

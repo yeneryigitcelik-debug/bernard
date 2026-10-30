@@ -299,6 +299,8 @@ your-project/
 
 **Committed:** `records.jsonl`, `categories.json`, `config.json`. Memory is code — it should be shared, reviewed, and versioned with git history.
 
+**Local writes:** CLI and MCP writers in the same working copy share a lock and replace JSONL atomically. Concurrent writers wait for a bounded interval; an active lock is never stolen. This does not coordinate separate computers or resolve Git merge conflicts. Malformed or invalid rows are skipped for retrieval and preserved on disk for manual repair.
+
 **Local:** `.bernard/.cache/`. The BM25 `index.json` is fully derivable from `records.jsonl` (rebuilt automatically when the records change, or when the locale changes). Committing derived data would only create meaningless conflicts.
 
 ## Internationalization
@@ -350,10 +352,10 @@ Retrieval is locale-aware too: Turkish gets a conservative stemmer (so `tokenlar
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). The project is intentionally dependency-light (only the MCP SDK + zod for the server) and ships a zero-dependency smoke test:
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). The project is intentionally dependency-light (only the MCP SDK + zod for the server) and ships an offline smoke suite plus storage, retrieval, hook and real MCP protocol regressions:
 
 ```bash
-npm install
+npm ci
 npm test
 ```
 

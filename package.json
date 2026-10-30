@@ -18,7 +18,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node test/smoke.js",
+    "test": "node test/smoke.js && node --test test/*.test.js",
     "start": "node bin/bernard.js",
     "mcp": "node bin/bernard.js mcp"
   },
@@ -50,6 +50,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "zod": "^3.25.0"
+    "zod": "^4.6.7"
   }
 }

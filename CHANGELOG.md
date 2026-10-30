@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Serialize local record writers and atomically replace JSONL to preserve concurrent additions and updates; retain malformed source lines for manual repair.
+- Validate full MCP record updates and skip malformed records during retrieval.
+- Handle prototype-like query tokens and rebuild incompatible or stale search caches.
+- Resolve Git hook paths through Git for linked worktrees and `core.hooksPath`; remove only recognized managed content and preserve custom or symlinked hooks.
+- Create initial memory files exclusively so `init` cannot overwrite a concurrent first record.
+- Update vulnerable dependencies, including Zod 4; exercise the real MCP protocol in regression tests.
+
 ## [0.1.0] - 2026-06-29
 
 Initial public release of **bernard** (`bernard-mcp`): repo-committed,

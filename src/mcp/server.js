@@ -9,7 +9,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import { findRepoRoot, bernardDir } from "../core/paths.js";
-import { readRecords, appendRecord, updateRecord } from "../core/store.js";
+import { readRecords, readSnapshot, appendRecord, updateRecord } from "../core/store.js";
 import { ensureIndex } from "../core/index-cache.js";
 import { retrieve } from "../core/retrieve.js";
 import { validateRecord, normalizeTags, TYPES } from "../util/schema.js";
@@ -70,6 +70,24 @@ function formatRecord(rec, score, t) {
     .join("\n");
 }
 
+// Map core EBERNARD_INVALID_RECORD errors to an MCP error result; rethrow others.
+function invalidRecordResult(err, t) {
+  if (err && err.code === "EBERNARD_INVALID_RECORD") {
+    const errors = Array.isArray(err.errors) && err.errors.length
+      ? err.errors
+      : [String(err.message || err)];
+    return {
+      isError: true,
+      content: [{ type: "text", text: t("mcp.invalidRecord", { errors: errors.join("\n- ") }) }],
+    };
+  }
+  throw err;
+}
+
+function notFoundResult(id, t) {
+  return { isError: true, content: [{ type: "text", text: t("mcp.notFound", { id }) }] };
+}
+
 export async function startServer() {
   const dir = resolveDir();
   const locale = resolveLocale({ config: localeFromConfig(dir) });
@@ -89,8 +107,9 @@ export async function startServer() {
       },
     },
     async ({ query, type, tag }) => {
-      const records = readRecords(dir);
-      const index = ensureIndex(dir, locale);
+      const snap = readSnapshot(dir);
+      const records = snap.records;
+      const index = ensureIndex(dir, locale, snap);
       const synonyms = readSynonyms(dir);
       const r = (readConfig(dir).retrieval) || {};
       const res = retrieve(query, records, {
@@ -136,10 +155,16 @@ export async function startServer() {
       const { ok, errors } = validateRecord(candidate, t);
       if (!ok) {
         return {
+          isError: true,
           content: [{ type: "text", text: t("mcp.invalidRecord", { errors: errors.join("\n- ") }) }],
         };
       }
-      const rec = appendRecord(dir, candidate);
+      let rec;
+      try {
+        rec = appendRecord(dir, candidate);
+      } catch (err) {
+        return invalidRecordResult(err, t);
+      }
       return {
         content: [{ type: "text", text: t("mcp.added", { id: rec.id, type: rec.type, title: rec.title }) }],
       };
@@ -181,9 +206,14 @@ export async function startServer() {
       },
     },
     async ({ id, by }) => {
-      const rec = updateRecord(dir, id, { invalid: true, superseded_by: by || null });
+      let rec;
+      try {
+        rec = updateRecord(dir, id, { invalid: true, superseded_by: by || null });
+      } catch (err) {
+        return invalidRecordResult(err, t);
+      }
       if (!rec) {
-        return { content: [{ type: "text", text: t("mcp.notFound", { id }) }] };
+        return notFoundResult(id, t);
       }
       const byStr = by ? t("mcp.invalidatedBy", { by }) : "";
       return {
@@ -214,9 +244,14 @@ export async function startServer() {
       if (content !== undefined) patch.content = content;
       if (tags !== undefined) patch.tags = normalizeTags(tags);
 
-      const rec = updateRecord(dir, id, patch);
+      let rec;
+      try {
+        rec = updateRecord(dir, id, patch);
+      } catch (err) {
+        return invalidRecordResult(err, t);
+      }
       if (!rec) {
-        return { content: [{ type: "text", text: t("mcp.notFound", { id }) }] };
+        return notFoundResult(id, t);
       }
       return {
         content: [{ type: "text", text: t("mcp.updated", { id: rec.id, type: rec.type, title: rec.title }) }],

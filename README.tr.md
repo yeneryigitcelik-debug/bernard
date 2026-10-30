@@ -301,6 +301,8 @@ projeniz/
 
 **Commit edilir:** `records.jsonl`, `categories.json`, `config.json`. Hafıza koddur — paylaşılmalı, review edilmeli ve git geçmişiyle versiyonlanmalı.
 
+**Yerel yazımlar:** Aynı çalışma kopyasındaki CLI ve MCP yazıcıları ortak kilit kullanır; JSONL atomik olarak değiştirilir. Eşzamanlı yazıcılar sınırlı süre bekler, etkin kilit zorla alınmaz. Bu mekanizma farklı bilgisayarları koordine etmez ve Git birleştirme çatışmalarını çözmez. Bozuk veya geçersiz satırlar aramada atlanır, elle onarım için diskte korunur.
+
 **Yerel kalır:** `.bernard/.cache/`. BM25 `index.json` tamamen `records.jsonl`'dan türetilebilir (kayıtlar veya locale değişince otomatik yeniden kurulur). Türetilmiş veriyi commit etmek yalnızca anlamsız çatışmalar yaratır.
 
 ## Uluslararasılaştırma
@@ -352,10 +354,10 @@ Getirme de locale-duyarlıdır: Türkçe için muhafazakâr bir stemmer (`tokenl
 
 ## Katkı
 
-Katkılar memnuniyetle karşılanır — bkz. [CONTRIBUTING.md](CONTRIBUTING.md). Proje bilerek bağımlılık-hafiftir (yalnızca sunucu için MCP SDK + zod) ve bağımlılıksız bir smoke test ile gelir:
+Katkılar memnuniyetle karşılanır — bkz. [CONTRIBUTING.md](CONTRIBUTING.md). Proje bilerek bağımlılık-hafiftir (yalnızca sunucu için MCP SDK + zod) ve çevrimdışı smoke testlerinin yanında kayıt, arama, hook ve gerçek MCP protokol regresyonlarını içerir:
 
 ```bash
-npm install
+npm ci
 npm test
 ```
 

@@ -1,6 +1,7 @@
 // Git helpers using node:child_process execFileSync. Failures never leak to the
 // caller (every failure returns [] / "" / false).
 import { execFileSync } from "node:child_process";
+import path from "node:path";
 
 // Run a single git command. Returns null on failure (never throws).
 function git(root, args) {
@@ -21,6 +22,19 @@ export function isGitRepo(root) {
   if (!root) return false;
   const out = git(root, ["rev-parse", "--is-inside-work-tree"]);
   return typeof out === "string" && out.trim() === "true";
+}
+
+// Absolute path of a hook as git resolves it (worktrees, core.hooksPath). null on failure.
+export function gitHookPath(root, name) {
+  if (!root || !name) return null;
+  // Resolve the directory only: Git canonicalizes a symlinked leaf, which
+  // would bypass install-hook's lstat check and remove the user-owned target.
+  const rel = "hooks";
+  let out = git(root, ["rev-parse", "--path-format=absolute", "--git-path", rel]);
+  if (out === null) out = git(root, ["rev-parse", "--git-path", rel]);
+  if (out === null) return null;
+  const p = out.trim().split("\n").pop().trim();
+  return p && !p.startsWith("--") ? path.join(path.resolve(root, p), name) : null;
 }
 
 // Separators for pretty format (unlikely to collide with commit messages).

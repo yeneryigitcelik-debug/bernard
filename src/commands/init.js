@@ -57,6 +57,47 @@ function seedSynonyms(locale) {
   };
 }
 
+/**
+ * Atomically create a file only if it does not exist (O_CREAT|O_EXCL).
+ * Returns true if created, false if it already existed (never overwrites).
+ * The content is computed lazily, only when creation is actually attempted.
+ */
+function createExclusive(filePath, makeContent) {
+  try {
+    fs.writeFileSync(filePath, makeContent(), { encoding: "utf8", flag: "wx" });
+    return true;
+  } catch (err) {
+    if (err && err.code === "EEXIST") return false;
+    throw err;
+  }
+}
+
+/**
+ * Idempotently append a line to a text file without losing existing content.
+ * Uses append mode only (never truncates). Returns "contains" | "added" | "created".
+ */
+function ensureLine(filePath, line) {
+  let existing = null;
+  try {
+    existing = fs.readFileSync(filePath, "utf8");
+  } catch (err) {
+    if (!err || err.code !== "ENOENT") throw err;
+  }
+
+  if (existing === null) {
+    // Try exclusive creation first; if someone created it meanwhile, fall back to append.
+    if (createExclusive(filePath, () => line + "\n")) return "created";
+    existing = fs.readFileSync(filePath, "utf8");
+  }
+
+  if (existing.split(/\r?\n/).map((s) => s.trim()).includes(line)) return "contains";
+
+  let add = line + "\n";
+  if (existing.length > 0 && !existing.endsWith("\n")) add = "\n" + add;
+  fs.appendFileSync(filePath, add, "utf8");
+  return "added";
+}
+
 export async function init(parsed) {
   const root = findRepoRoot();
   const dir = bernardDir(root);
@@ -69,87 +110,66 @@ export async function init(parsed) {
   const created = [];
   const skipped = [];
 
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(dir, { recursive: true });
 
   // 1) records.jsonl (empty)
   const recordsPath = path.join(dir, "records.jsonl");
-  if (fs.existsSync(recordsPath)) {
-    skipped.push(".bernard/records.jsonl");
-  } else {
-    fs.writeFileSync(recordsPath, "", "utf8");
+  if (createExclusive(recordsPath, () => "")) {
     created.push(".bernard/records.jsonl");
+  } else {
+    skipped.push(".bernard/records.jsonl");
   }
 
   // 2) categories.json
   const categoriesPath = path.join(dir, "categories.json");
-  if (fs.existsSync(categoriesPath)) {
-    skipped.push(".bernard/categories.json");
-  } else {
-    const categories = { types: [...TYPES], synonyms: seedSynonyms(locale) };
-    fs.writeFileSync(categoriesPath, JSON.stringify(categories, null, 2) + "\n", "utf8");
+  if (
+    createExclusive(categoriesPath, () => {
+      const categories = { types: [...TYPES], synonyms: seedSynonyms(locale) };
+      return JSON.stringify(categories, null, 2) + "\n";
+    })
+  ) {
     created.push(".bernard/categories.json");
+  } else {
+    skipped.push(".bernard/categories.json");
   }
 
   // 3) config.json
   const configPath = path.join(dir, "config.json");
-  if (fs.existsSync(configPath)) {
-    skipped.push(".bernard/config.json");
-  } else {
-    const config = {
-      project: detectProjectName(root),
-      locale,
-      retrieval: {
-        max_results: 8,
-        recency_weight: 0.3,
-        half_life_days: 30,
-        type_weights: {
-          decision: 1.2,
-          architecture: 1.2,
-          bug: 1.0,
-          preference: 1.0,
-          note: 0.9,
+  if (
+    createExclusive(configPath, () => {
+      const config = {
+        project: detectProjectName(root),
+        locale,
+        retrieval: {
+          max_results: 8,
+          recency_weight: 0.3,
+          half_life_days: 30,
+          type_weights: {
+            decision: 1.2,
+            architecture: 1.2,
+            bug: 1.0,
+            preference: 1.0,
+            note: 0.9,
+          },
         },
-      },
-    };
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+      };
+      return JSON.stringify(config, null, 2) + "\n";
+    })
+  ) {
     created.push(".bernard/config.json");
+  } else {
+    skipped.push(".bernard/config.json");
   }
 
   // 4) add ".bernard/.cache/" to .gitignore
-  const gitignorePath = path.join(root, ".gitignore");
-  const ignoreLine = ".bernard/.cache/";
-  let gi = "";
-  let giExisted = false;
-  if (fs.existsSync(gitignorePath)) {
-    giExisted = true;
-    gi = fs.readFileSync(gitignorePath, "utf8");
-  }
-  if (gi.split(/\r?\n/).map((s) => s.trim()).includes(ignoreLine)) {
-    skipped.push(t("init.gitignoreContains"));
-  } else {
-    let add = ignoreLine + "\n";
-    if (giExisted && gi.length > 0 && !gi.endsWith("\n")) add = "\n" + add;
-    fs.appendFileSync(gitignorePath, add, "utf8");
-    created.push(giExisted ? t("init.gitignoreAdded") : t("init.gitignoreCreated"));
-  }
+  const gi = ensureLine(path.join(root, ".gitignore"), ".bernard/.cache/");
+  if (gi === "contains") skipped.push(t("init.gitignoreContains"));
+  else created.push(gi === "added" ? t("init.gitignoreAdded") : t("init.gitignoreCreated"));
 
   // 5) add union-merge line to .gitattributes (idempotent)
-  const gitattributesPath = path.join(root, ".gitattributes");
-  const attrLine = ".bernard/records.jsonl merge=union";
-  let attr = "";
-  let attrExisted = false;
-  if (fs.existsSync(gitattributesPath)) {
-    attrExisted = true;
-    attr = fs.readFileSync(gitattributesPath, "utf8");
-  }
-  if (attr.split(/\r?\n/).map((s) => s.trim()).includes(attrLine)) {
-    skipped.push(t("init.gitattrContains"));
-  } else {
-    let add = attrLine + "\n";
-    if (attrExisted && attr.length > 0 && !attr.endsWith("\n")) add = "\n" + add;
-    fs.appendFileSync(gitattributesPath, add, "utf8");
-    created.push(attrExisted ? t("init.gitattrAdded") : t("init.gitattrCreated"));
-  }
+  const ga = ensureLine(path.join(root, ".gitattributes"), ".bernard/records.jsonl merge=union");
+  if (ga === "contains") skipped.push(t("init.gitattrContains"));
+  else created.push(ga === "added" ? t("init.gitattrAdded") : t("init.gitattrCreated"));
 
   // Summary (stdout)
   console.log(t("init.done", { dir }));
@@ -164,4 +184,5 @@ export async function init(parsed) {
   if (created.length === 0) console.log(t("init.allInPlace"));
 
   log.success(t("init.success"));
+  return { dir, created, skipped };
 }

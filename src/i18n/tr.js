@@ -4,6 +4,28 @@
 // kanonik (İngilizce) kalır; yalnızca çevre metin Türkçeleşir.
 
 export const tr = {
+  // Storage validation and concurrency diagnostics.
+  "store.invalidRecord": "Geçersiz kayıt: {errors}",
+  "store.invalidLine": "Geçersiz kayıt satırı atlanıyor: {line} ({errors})",
+  "store.invalidUtf8": "Geçersiz UTF-8 içeren satır atlanıyor ({bytes} bayt); orijinal baytlar korunuyor.",
+  "store.duplicateId": "\"{id}\" kimlikli bir kayıt zaten var.",
+  "store.patchNotObject": "Yama bir nesne olmalıdır.",
+  "store.idImmutable": "Kayıt kimliği değiştirilemez.",
+  "store.supersedeSelf": "\"{id}\" kaydı kendisinin yerine geçemez.",
+  "store.supersedeMissing": "Yerine geçecek \"{id}\" kaydı bulunamadı.",
+  "store.supersedeCycle": "\"{id}\" kaydının yerine \"{by}\" koymak bir döngü oluşturur.",
+  "store.lockOwnerUnknown": "bilinmeyen sahip",
+  "store.lockTimeout": "{path} depo kilidi için {ms} ms beklendikten sonra zaman aşımı (sahibi: {owner}).",
+  "store.lockGarbled": "{ms} ms sonra zaman aşımı: {path} kilit dosyasının içeriği okunamıyor ve sahibi belirlenemiyor. Çalışan bir bernard işlemi yoksa {path} dosyasını elle silin.",
+  "store.lockBreakerStuck": "{ms} ms sonra zaman aşımı: {path} eski kilit kırıcı dosyası mevcut (sahibi: {owner}). Bu dosya asla otomatik silinmez. Çalışan bir bernard işlemi yoksa {path} dosyasını (ve sahibi ölmüşse {lock} dosyasını) elle silin.",
+  "store.lockLost": "{path} depo kilidi bırakılırken artık bize ait değildi.",
+  "schema.idRequired": "Kimlik zorunludur ve boş olmayan bir metin olmalıdır.",
+  "schema.createdInvalid": "Oluşturulma tarihi geçerli bir tarih metni olmalıdır.",
+  "schema.invalidBoolean": "invalid alanı mantıksal (boolean) bir değer olmalıdır.",
+  "schema.supersededByInvalid": "superseded_by null ya da boş olmayan bir metin olmalıdır.",
+  "schema.sourceString": "Kaynak bir metin olmalıdır.",
+  "store.indexWriteFailed": "Yerel arama dizini yazılamadı: {error}",
+
   // --- ortak ---
   "common.noGitRepo": "Git deposu bulunamadı; geçerli dizin kullanılıyor.",
   "common.corruptLine": "Bozuk satır atlandı: {line}",
