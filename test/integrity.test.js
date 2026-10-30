@@ -165,3 +165,13 @@ test('supersession validation inspects ambiguous intermediate copies instead of 
   assert.throws(()=>updateRecord(dir,'a',{invalid:true,superseded_by:'b'}),e=>e.code==='EBERNARD_INVALID_RECORD');
   assert.ok(readRawRecords(dir).equals(before));
 });
+
+
+test('valueless --supersedes never silently appends an ordinary record', (t)=>{
+  const {dir,file,cli}=fixture(t);fs.writeFileSync(file,line(rec('ber_A')));
+  const before=readRawRecords(dir);
+  for (const flag of ['--supersedes','--supersedes=']) {
+    const result=cli('add','--type','note','--title','Replacement','--content','fixture',flag);
+    assert.equal(result.status,1);assert.match(result.stderr,/--supersedes/);assert.ok(readRawRecords(dir).equals(before));
+  }
+});

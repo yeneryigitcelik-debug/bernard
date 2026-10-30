@@ -72,6 +72,11 @@ export async function add(parsed) {
 
   // --supersedes <oldId>: new record supersedes an old one
   const oldId = asString(flags.supersedes);
+  if (Object.hasOwn(flags, "supersedes") && oldId === undefined) {
+    log.error(t("cli.flagNeedsValue", { flag: "--supersedes" }));
+    process.exitCode = 1;
+    return;
+  }
   if (oldId) {
     const records = readRecords(dir);
     if (!records.some((r) => r.id === oldId)) {
