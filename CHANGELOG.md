@@ -12,6 +12,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Keep expected CLI errors concise and finish interactive distill reports after per-record failures; reject empty read filters.
+- Respect effective Git ignore/attribute rules in doctor and distinguish unreadable files from missing ones.
+- Require initialization for new tag stores and keep category temporary files inside the ignored cache directory, preserving existing standalone category workflows.
+
 - Prevent union-merge duplicate IDs from resurrecting invalid records; quarantine conflicting active copies, report their lines and retain every source segment. Bump derived cache format to 3.
 - Preserve supersession provenance on invalidation retries; make `add --supersedes` one atomic transaction.
 - Keep uninitialized reads free of writes and reject MCP writes without a memory store.

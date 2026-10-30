@@ -6,6 +6,9 @@ import { findRepoRoot, bernardDir } from "../core/paths.js";
 import { readRecords, updateRecord } from "../core/store.js";
 import { distill } from "../core/distill.js";
 import { getT } from "../i18n/index.js";
+import { log } from "../util/log.js";
+
+const EXPECTED_CODES = new Set(["EBERNARD_INVALID_RECORD", "EBERNARD_LOCK_TIMEOUT"]);
 
 function ask(rl, q) {
   return new Promise((resolve) => rl.question(q, resolve));
@@ -124,7 +127,15 @@ export async function distillCmd(parsed) {
       const answer = await ask(rl, t("distill.applyPrompt"));
       if (isYes(answer)) {
         for (const old of c.toInvalidate) {
-          const u = updateRecord(dir, old, { invalid: true, superseded_by: c.keep });
+          let u = null;
+          try {
+            u = updateRecord(dir, old, { invalid: true, superseded_by: c.keep });
+          } catch (err) {
+            if (!err || !EXPECTED_CODES.has(err.code)) throw err;
+            log.error(String(err.message));
+            process.exitCode = 1;
+            continue;
+          }
           if (u) {
             total++;
             console.log(`  ${t("distill.applied", { old, keep: c.keep })}`);
@@ -136,8 +147,7 @@ export async function distillCmd(parsed) {
     }
   } finally {
     rl.close();
+    console.log("");
+    console.log(t("distill.completed", { n: total }));
   }
-
-  console.log("");
-  console.log(t("distill.completed", { n: total }));
 }

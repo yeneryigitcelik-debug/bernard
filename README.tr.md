@@ -197,6 +197,8 @@ bernard tags --remove "auth"
 
 `categories.json` içindeki tipleri ve eş anlamlı gruplarını listeler/düzenler. Eş anlamlılar arama sırasında sorgu genişletmeyi besler; takımın söz dağarcığı takımın geri çağırma gücü olur.
 
+Yeni projelerde etiketleri düzenlemeden önce `init` çalıştırılır. Önceki sürümlerden kalan bağımsız `categories.json` dosyaları uyumluluk için düzenlenebilir.
+
 ### Öner (commit'lerden taslak)
 
 ```bash

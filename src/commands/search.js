@@ -30,12 +30,24 @@ function shortContent(content, n = 140) {
   return s.length <= n ? s : s.slice(0, n).trimEnd() + "…";
 }
 
+function valuelessFilter(flags) {
+  return ["type", "tag", "tags"].find((k) => Object.hasOwn(flags, k) &&
+    (flags[k] === true || (typeof flags[k] === "string" && flags[k].trim() === ""))) || null;
+}
+
 export async function search(parsed) {
   const { _ = [], flags = {} } = parsed || {};
   const root = findRepoRoot();
   const dir = bernardDir(root);
   const locale = resolveLocale({ flag: flags.locale, config: localeFromConfig(dir) });
   const t = getT(dir, flags.locale);
+
+  const bad = valuelessFilter(flags);
+  if (bad) {
+    log.error(t("cli.flagNeedsValue", { flag: `--${bad}` }));
+    process.exitCode = 1;
+    return;
+  }
 
   const query = _.join(" ").trim();
   if (!query) {

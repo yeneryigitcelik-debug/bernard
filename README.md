@@ -192,7 +192,7 @@ bernard tags --add "auth=login,session"
 bernard tags --remove "auth"
 ```
 
-Lists/edits the types and synonym groups in `categories.json`. Synonyms power query expansion at search time, so the team's vocabulary becomes the team's recall.
+Lists/edits the types and synonym groups in `categories.json`. Fresh projects must run `init` before editing tags; existing standalone categories files remain editable for compatibility. Synonyms power query expansion at search time, so the team's vocabulary becomes the team's recall.
 
 ### Suggest (draft from commits)
 

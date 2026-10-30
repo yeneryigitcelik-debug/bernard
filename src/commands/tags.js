@@ -10,7 +10,7 @@ import { findRepoRoot, bernardDir } from "../core/paths.js";
 import { log } from "../util/log.js";
 import { getT } from "../i18n/index.js";
 import { TYPES } from "../util/schema.js";
-import { withStoreLock, writeFileAtomic } from "../core/store.js";
+import { withStoreLock, writeFileAtomic, storeCacheDir, recordsPath } from "../core/store.js";
 
 function categoriesPath(dir) {
   return path.join(dir, "categories.json");
@@ -32,8 +32,18 @@ function readCategories(p) {
   return raw; // Preserve unknown fields, never silently replace damaged data.
 }
 
+// Temp files live in the ignored .cache directory; caller holds the store lock.
 function writeCategories(p, data) {
-  writeFileAtomic(p, JSON.stringify(data, null, 2) + "\n");
+  writeFileAtomic(p, JSON.stringify(data, null, 2) + "\n", { tmpDir: storeCacheDir(path.dirname(p)) });
+}
+
+// A fresh store must be initialized first. Preserve standalone category files
+// supported by earlier CLI versions; editing existing data is not initialization.
+function requireStore(dir, t) {
+  if (fs.existsSync(recordsPath(dir)) || fs.existsSync(categoriesPath(dir))) return true;
+  log.error(t("mcp.notInitialized", { dir }));
+  process.exitCode = 1;
+  return false;
 }
 
 async function runTags(parsed) {
@@ -62,6 +72,7 @@ async function runTags(parsed) {
       process.exitCode = 1;
       return;
     }
+    if (!requireStore(dir, t)) return;
 
     const merged = withStoreLock(dir, () => {
       const data = readCategories(p);
@@ -85,6 +96,7 @@ async function runTags(parsed) {
       return;
     }
     const key = flags.remove.trim();
+    if (!requireStore(dir, t)) return;
     const removed = withStoreLock(dir, () => {
       const data = readCategories(p);
       if (!Object.hasOwn(data.synonyms, key)) return false;
@@ -125,7 +137,8 @@ export async function tags(parsed) {
   try { return await runTags(parsed); }
   catch (error) {
     const dir = bernardDir(findRepoRoot());
-    log.error(getT(dir)("tags.unreadable", { path: categoriesPath(dir), error: error.message }));
+    if (error && error.code === "EBERNARD_LOCK_TIMEOUT") log.error(String(error.message));
+    else log.error(getT(dir)("tags.unreadable", { path: categoriesPath(dir), error: error.message }));
     process.exitCode = 1;
   }
 }

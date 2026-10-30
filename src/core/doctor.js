@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { parseLines, fingerprintBuffer, recordsPath, lockPath, readOwner, isOwnerDead } from "./store.js";
 import { INDEX_VERSION, isValidIndex } from "./index-cache.js";
 import { TYPES } from "../util/schema.js";
@@ -12,6 +12,29 @@ import { classify } from "../commands/install-hook.js";
 
 const object = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const numeric = (v) => typeof v === "number" && Number.isFinite(v);
+// Distinct from null (missing): the file exists but could not be read.
+const UNREADABLE = Symbol("unreadable");
+
+function gitRun(root, args) {
+  const r = spawnSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  return r.error ? null : r;
+}
+
+// Effective Git semantics when available; null means "unknown, use fallback".
+function gitLayout(root) {
+  const out = { ignored: null, union: null };
+  const inside = gitRun(root, ["rev-parse", "--is-inside-work-tree"]);
+  if (!inside || inside.status !== 0 || inside.stdout.trim() !== "true") return out;
+  const ci = gitRun(root, ["check-ignore", "--no-index", "-q", "--", ".bernard/.cache/__bernard_doctor_probe__"]);
+  if (ci && ci.status === 0) out.ignored = true;
+  else if (ci && ci.status === 1) out.ignored = false;
+  const ca = gitRun(root, ["check-attr", "-z", "merge", "--", ".bernard/records.jsonl"]);
+  if (ca && ca.status === 0) {
+    const parts = ca.stdout.split("\0");
+    if (parts.length >= 3 && parts[1] === "merge") out.union = parts[2] === "union";
+  }
+  return out;
+}
 
 export function diagnose(root, locale = "en", version = "0.0.0") {
   const t = makeT(locale);
@@ -21,8 +44,9 @@ export function diagnose(root, locale = "en", version = "0.0.0") {
   const read = (file) => {
     try { return fs.readFileSync(file); }
     catch (error) {
-      if (error.code !== "ENOENT") add("layout.unreadable", "error", { path: file, error: error.message });
-      return null;
+      if (error.code === "ENOENT") return null;
+      add("layout.unreadable", "error", { path: file, error: error.message });
+      return UNREADABLE;
     }
   };
   let parsed = { lines: [], records: [], duplicates: [] };
@@ -39,7 +63,8 @@ export function diagnose(root, locale = "en", version = "0.0.0") {
     return finish();
   }
   raw = read(recordsPath(dir));
-  if (raw === null) add("layout.missing_file", "error", { file: "records.jsonl" });
+  if (raw === UNREADABLE) raw = null;
+  else if (raw === null) add("layout.missing_file", "error", { file: "records.jsonl" });
   else {
     parsed = parseLines(raw, t);
     for (const line of parsed.lines) if (line.error) add(line.error.id, "error", { lineNo: line.lineNo, errors: line.error.errors });
@@ -83,6 +108,7 @@ export function diagnose(root, locale = "en", version = "0.0.0") {
 
   for (const name of ["config.json", "categories.json"]) {
     const bytes = read(path.join(dir, name));
+    if (bytes === UNREADABLE) continue;
     if (bytes === null) { add("layout.missing_file", "warning", { file: name }); continue; }
     let data;
     try { data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
@@ -108,15 +134,26 @@ export function diagnose(root, locale = "en", version = "0.0.0") {
       if (!object(data.synonyms) || Object.values(data.synonyms).some((v) => !Array.isArray(v) || v.some((s) => typeof s !== "string"))) add("categories.synonyms_shape", "warning");
     }
   }
-  const linesOf = (file) => (read(path.join(root, file)) || Buffer.alloc(0)).toString("utf8").split(/\r?\n/).map((l) => l.trim());
-  if (!linesOf(".gitignore").some((l) => [".bernard/.cache/", ".bernard/.cache", "/.bernard/.cache/", "/.bernard/.cache"].includes(l))) add("layout.gitignore_cache", "warning");
-  if (!linesOf(".gitattributes").some((l) => /^\/?\.bernard\/records\.jsonl\s+merge=union(?:\s|$)/.test(l))) add("layout.gitattributes_union", "warning");
+  const linesOf = (file) => {
+    const bytes = read(path.join(root, file));
+    return (Buffer.isBuffer(bytes) ? bytes : Buffer.alloc(0)).toString("utf8").split(/\r?\n/).map((l) => l.trim());
+  };
+  const layout = gitLayout(root);
+  const ignored = layout.ignored !== null ? layout.ignored
+    : linesOf(".gitignore").some((l) => [".bernard/.cache/", ".bernard/.cache", "/.bernard/.cache/", "/.bernard/.cache"].includes(l));
+  if (!ignored) add("layout.gitignore_cache", "warning");
+  const union = layout.union !== null ? layout.union
+    : linesOf(".gitattributes").some((l) => {
+      const tokens = l.split(/\s+/).filter(Boolean);
+      return tokens.length > 1 && (tokens[0] === ".bernard/records.jsonl" || tokens[0] === "/.bernard/records.jsonl") && tokens.slice(1).includes("merge=union");
+    });
+  if (!union) add("layout.gitattributes_union", "warning");
   try {
     const tracked = execFileSync("git", ["ls-files", "-z", "--", ".bernard/.cache"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean);
     if (tracked.length) add("layout.cache_tracked", "warning", { files: tracked });
   } catch { /* Non-Git stores are supported; no network calls. */ }
   const cache = read(path.join(dir, ".cache", "index.json"));
-  if (cache) {
+  if (Buffer.isBuffer(cache)) {
     let index;
     try { index = JSON.parse(cache.toString("utf8")); } catch { /* stale below */ }
     if (index && index.version !== INDEX_VERSION) add("cache.version_mismatch", "info", { expected: INDEX_VERSION, actual: index.version });

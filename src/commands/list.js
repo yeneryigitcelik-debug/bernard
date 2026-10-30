@@ -4,6 +4,7 @@
 import { findRepoRoot, bernardDir } from "../core/paths.js";
 import { readRecords } from "../core/store.js";
 import { getT } from "../i18n/index.js";
+import { log } from "../util/log.js";
 
 function badge(type) {
   return `[${String(type || "?").toUpperCase()}]`;
@@ -17,10 +18,22 @@ function formatDate(iso) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+function valuelessFilter(flags) {
+  return ["type", "tag", "tags"].find((k) => Object.hasOwn(flags, k) &&
+    (flags[k] === true || (typeof flags[k] === "string" && flags[k].trim() === ""))) || null;
+}
+
 export async function list(parsed) {
   const flags = parsed.flags || {};
   const dir = bernardDir(findRepoRoot());
   const t = getT(dir);
+
+  const bad = valuelessFilter(flags);
+  if (bad) {
+    log.error(t("cli.flagNeedsValue", { flag: `--${bad}` }));
+    process.exitCode = 1;
+    return;
+  }
 
   let records = readRecords(dir);
 

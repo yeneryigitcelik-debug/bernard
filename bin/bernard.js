@@ -9,6 +9,9 @@ import { makeT, resolveLocale } from "../src/i18n/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Expected, user-actionable failures: print the localized message only.
+const EXPECTED_CODES = new Set(["EBERNARD_INVALID_RECORD", "EBERNARD_LOCK_TIMEOUT"]);
+
 // alias -> [module path (relative to this file), export name]
 const ROUTES = {
   init: ["../src/commands/init.js", "init"],
@@ -114,6 +117,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  log.error(err && err.stack ? err.stack : String(err));
+  if (err && EXPECTED_CODES.has(err.code)) log.error(String(err.message));
+  else log.error(err && err.stack ? err.stack : String(err));
   process.exitCode = 1;
 });
