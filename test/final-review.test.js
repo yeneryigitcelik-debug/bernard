@@ -46,6 +46,9 @@ test('tags mutations refuse a missing store; default read stays read-only', (t)=
 test('tags atomic temp file is created under ignored .cache and unknown fields survive', async (t)=>{
   const {root,dir}=fixture(t);const cat=path.join(dir,'categories.json');
   fs.writeFileSync(cat,JSON.stringify({types:['note'],synonyms:{},future:{keep:1}}));
+  fs.rmSync(path.join(dir, 'records.jsonl'));
+  fs.rmSync(path.join(dir, '.cache'), { recursive: true, force: true });
+  assert.equal(fs.existsSync(path.join(dir, '.cache')), false, 'standalone categories start without a cache');
   const seen=[];const orig=fs.renameSync;
   const mocked=t.mock.method(fs,'renameSync',(from,to)=>{if(path.resolve(to)===path.resolve(cat))seen.push(from);return orig(from,to);});
   const cwd=process.cwd(), code=process.exitCode;
