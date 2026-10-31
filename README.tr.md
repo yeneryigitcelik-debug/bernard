@@ -165,6 +165,8 @@ bernard invalidate ber_abc123 --by ber_def456
 
 Bir kaydı **silmeden** geçersiz işaretler (`invalid: true`). `--by` ile onu güncelleyen yeni kaydı bağlarsınız; böylece karar geçmişi korunur. Arama, geçersiz kayıtları varsayılan olarak eler.
 
+Boş olmayan bir `superseded_by` bağlantısı da kaydı geçmiş sayar; eski veya birleştirilmiş satırda `invalid: false` kalmış olsa bile. Arama bu kaydı eler; tam inceleme ve varsayılan geçmiş listesi satırın tamamını ve yerine geçen kimliği korur. Damıtma mevcut bağlantıyı gösterir, fakat yerini başka kayıt almış satırı güncel karar olarak tutmayı önermez. Bu okumalar bayrakları düzeltmez veya kayıtları yeniden yazmaz; tutarsız veri için `doctor` kullanın.
+
 Eski bir kararı doğrudan geçersiz kılan yeni bir kayıt eklemek için:
 
 ```bash

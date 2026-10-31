@@ -14,6 +14,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Use the same active-record policy for recall and distill: legacy replacement-linked rows stay out of current results/proposals while their complete history and replacement edges remain readable without rewriting data.
 - Show invalid/replacement state in MCP record snippets and replacement IDs in CLI history lists; reject unknown search/list type filters instead of reporting empty memory.
 - Keep expected CLI errors concise and finish interactive distill reports after per-record failures; reject empty read filters.
 - Respect effective Git ignore/attribute rules in doctor and distinguish unreadable files from missing ones.

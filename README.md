@@ -163,6 +163,8 @@ bernard invalidate ber_abc123 --by ber_def456
 
 Marks a record invalid **without deleting it** (`invalid: true`). `--by` links the record that replaces it, preserving the decision history. Search drops invalid records by default. Retrying invalidation without `--by` preserves any existing replacement link.
 
+A non-empty `superseded_by` link also makes a row historical, even if an older or merged row still has `invalid: false`. Search excludes it, while full inspection and the default history list retain the complete row and replacement target. Distill shows that existing edge but never proposes the replaced row as the current keeper. These reads do not repair flags or rewrite records; use `doctor` to diagnose inconsistent stored data.
+
 To record a new decision that directly supersedes an old one:
 
 ```bash
