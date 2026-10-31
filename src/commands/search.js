@@ -5,6 +5,7 @@ import { readSnapshot } from "../core/store.js";
 import { ensureIndex } from "../core/index-cache.js";
 import { retrieve } from "../core/retrieve.js";
 import { log } from "../util/log.js";
+import { TYPES } from "../util/schema.js";
 import { getT, resolveLocale, localeFromConfig } from "../i18n/index.js";
 
 function readJsonSafe(file, fallback) {
@@ -45,6 +46,12 @@ export async function search(parsed) {
   const bad = valuelessFilter(flags);
   if (bad) {
     log.error(t("cli.flagNeedsValue", { flag: `--${bad}` }));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (typeof flags.type === "string" && !TYPES.includes(flags.type)) {
+    log.error(t("schema.invalidType", { type: flags.type, types: TYPES.join(", ") }));
     process.exitCode = 1;
     return;
   }

@@ -17,6 +17,7 @@ const BIN = path.resolve(__dirname, "..", "bin", "bernard.js");
 
 const EXPECTED_TOOLS = [
   "bernard_add",
+  "bernard_get",
   "bernard_invalidate",
   "bernard_list",
   "bernard_search",
@@ -133,7 +134,7 @@ test("bernard MCP server over real stdio", { timeout: 15000 }, async () => {
 
     const call = (name, args) => client.callTool({ name, arguments: args });
 
-    // Six tools
+    // Seven tools
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, EXPECTED_TOOLS);

@@ -132,6 +132,28 @@ bernard list --type decision
 bernard list --tag auth
 ```
 
+The list includes history and marks invalid records and their replacement IDs.
+Search/list type filters reject unknown types with the valid choices instead of
+silently returning an empty result. Tags keep their exact-match behavior.
+
+### Inspect a full record
+
+```bash
+bernard show <record-id>
+bernard show <record-id> --json
+bernard goster <record-id> --json --locale tr
+```
+
+Use the exact ID from search or list to read the complete content. `show --json`
+prints only the full stored record, including unknown fields, `invalid`, and
+`superseded_by`; search and list remain compact views. Inspection includes history,
+so check its state before using a record as current context or updating it.
+It never creates a missing store, rebuilds the cache or changes record bytes.
+
+Differing copies of an ID cannot be inspected as one exact record, even when a
+copy is invalid. Run `bernard doctor` and reconcile the reported lines manually.
+Identical copies can be inspected; no copy is repaired or deleted.
+
 ### Invalidate (supersede)
 
 ```bash
@@ -214,7 +236,7 @@ Installs a marked, idempotent `.git/hooks/post-commit` reminder to run `bernard 
 
 ## MCP integration (the main path)
 
-bernard's real power is connecting to an AI agent. As an **MCP server** it exposes six tools that an agent uses automatically — searching prior decisions before it starts, recording new ones, and invalidating stale ones.
+bernard's real power is connecting to an AI agent. As an **MCP server** it exposes seven tools that an agent uses automatically — searching prior decisions before it starts, recording new ones, and invalidating stale ones.
 
 Add to your project's `.mcp.json`:
 
@@ -248,7 +270,8 @@ The server exposes:
 |------|--------------|
 | **`bernard_search`** | Search past decisions, architecture notes, fixed bugs, and preferences. The key tool — the agent calls it before starting work. |
 | **`bernard_add`** | Add a new record (`source: "agent"`); validates the schema before writing. |
-| **`bernard_list`** | List records, optionally filtered by type/tag. |
+| **`bernard_list`** | List records with visible state and replacement IDs, optionally filtered by type/tag. History is included by default; `include_invalid: false` excludes invalid or replacement-linked records. |
+| **`bernard_get`** | Inspect one exact `id` as full JSON, including historical state and every stored field. Read-only; differing duplicate copies require manual reconciliation. |
 | **`bernard_invalidate`** | Invalidate a record (`id`, optional `by`). Marks, never deletes. |
 | **`bernard_update`** | Update fields of an existing record; only provided fields change. |
 | **`bernard_suggest`** | Fetch recent commits + diffs so the agent can extract records worth keeping. |

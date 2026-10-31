@@ -37,7 +37,7 @@ node bin/bernard.js search test
 bin/bernard.js          CLI entry + command router (English names + Turkish aliases)
 src/core/               store, bm25, retrieve, index-cache, distill, paths
 src/commands/           one file per command
-src/mcp/server.js       MCP server (6 tools)
+src/mcp/server.js       MCP server (7 tools)
 src/util/               schema, git, args, log
 src/i18n/               index (resolver) + en.js + tr.js catalogs
 test/smoke.js           core, CLI and bilingual smoke assertions

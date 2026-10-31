@@ -3,6 +3,19 @@
 // Keep this file and tr.js in sync, key-for-key.
 
 export const en = {
+  "inspect.usage": "Usage: bernard show <id> [--json] (exactly one record ID is required).",
+  "inspect.jsonNoValue": "--json does not take a value.",
+  "inspect.notInitialized": "No bernard store found at {dir}. Run `bernard init` first.",
+  "inspect.notFound": "Record not found: {id}",
+  "inspect.ambiguous": "Record ID {id} has conflicting copies on lines {lines}. Run `bernard doctor` to resolve them before inspecting.",
+  "inspect.state": "state: {state}",
+  "inspect.stateActive": "active",
+  "inspect.stateInvalid": "invalid",
+  "inspect.stateReplaced": "replacement linked",
+  "inspect.replacement": "replaced by: {id}",
+  "inspect.source": "source: {source}",
+  "mcp.get.desc": "Fetch one record by exact ID as full JSON, including history (invalidated or replaced records keep their invalid/superseded_by fields). Use it to inspect a record before updating or invalidating it. This is not a search.",
+  "mcp.list.includeInvalid": "Default true (history included). Set false to return only active records, excluding invalid or replacement-linked history.",
   "doctor.layout.root_unreadable": "Cannot inspect root {path}: {error}",
   "doctor.layout.unreadable": "Cannot read {path}: {error}",
   "doctor.layout.missing_dir": "Memory is not initialized at {path}; run bernard init in the intended project root.",
@@ -263,6 +276,7 @@ Commands:
   add        (alias: ekle)      Add a new memory record
   search     (alias: ara)       Search records (BM25 full-text retrieval)
   list       (alias: listele)   List records (newest first)
+  show       (alias: goster)    Inspect one full record by exact ID [--json]
   invalidate (alias: gecersiz)  Mark a record invalid (does not delete)
   distill    (alias: damit)     Surface conflicts / supersession chains
   suggest    (alias: oner)      Draft records from recent commits

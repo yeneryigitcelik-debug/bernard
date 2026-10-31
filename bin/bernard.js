@@ -35,6 +35,8 @@ const ROUTES = {
   etiketler: ["../src/commands/tags.js", "tags"],
   doctor: ["../src/commands/doctor.js", "doctor"],
   doktor: ["../src/commands/doctor.js", "doctor"],
+  show: ["../src/commands/show.js", "show"],
+  goster: ["../src/commands/show.js", "show"],
   mcp: ["../src/mcp/server.js", "startServer"],
 };
 

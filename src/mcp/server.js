@@ -12,6 +12,7 @@ import { findRepoRoot, bernardDir } from "../core/paths.js";
 import { readRecords, readSnapshot, appendRecord, updateRecord } from "../core/store.js";
 import { ensureIndex } from "../core/index-cache.js";
 import { retrieve } from "../core/retrieve.js";
+import { resolveRecord, stateLine, isActive } from "../core/inspect.js";
 import { validateRecord, normalizeTags, TYPES } from "../util/schema.js";
 import { recentCommits, commitDiff, isGitRepo } from "../util/git.js";
 import { log } from "../util/log.js";
@@ -60,6 +61,7 @@ function formatRecord(rec, score, t) {
   return [
     `[${rec.type}] ${rec.title}${scoreStr}`,
     `  ${t("label.id")}: ${rec.id}  ${t("label.date")}: ${date}  ${t("label.tags")}: ${tags}`,
+    `  ${stateLine(rec, t)}`,
     short ? `  ${short}` : "",
   ]
     .filter(Boolean)
@@ -106,7 +108,7 @@ export async function startServer() {
       description: t("mcp.search.desc"),
       inputSchema: {
         query: z.string(),
-        type: z.string().optional(),
+        type: z.enum(TYPES).optional(),
         tag: z.string().optional(),
       },
     },
@@ -184,16 +186,18 @@ export async function startServer() {
     {
       description: t("mcp.list.desc"),
       inputSchema: {
-        type: z.string().optional(),
+        type: z.enum(TYPES).optional(),
         tag: z.string().optional(),
+        include_invalid: z.boolean().optional().describe(t("mcp.list.includeInvalid")),
       },
     },
-    async ({ type, tag }) => {
+    async ({ type, tag, include_invalid }) => {
       const snap = readSnapshot(dir);
       let records = snap.records;
       const notice = snapshotNotice(snap, t);
       if (type) records = records.filter((r) => r.type === type);
       if (tag) records = records.filter((r) => Array.isArray(r.tags) && r.tags.includes(tag));
+      if (include_invalid === false) records = records.filter((r) => isActive(r));
       records.sort((a, b) => (Date.parse(b.created) || 0) - (Date.parse(a.created) || 0));
 
       if (!records.length) {
@@ -269,6 +273,30 @@ export async function startServer() {
       return {
         content: [{ type: "text", text: t("mcp.updated", { id: rec.id, type: rec.type, title: rec.title }) }],
       };
+    }
+  );
+
+  // --- bernard_get: exact-ID read-only inspection (history included) ---
+  server.registerTool(
+    "bernard_get",
+    {
+      description: t("mcp.get.desc"),
+      inputSchema: { id: z.string().min(1) },
+    },
+    async ({ id }) => {
+      if (!fs.existsSync(path.join(dir, "records.jsonl"))) {
+        return { isError: true, content: [{ type: "text", text: t("inspect.notInitialized", { dir }) }] };
+      }
+      const snap = readSnapshot(dir);
+      const res = resolveRecord(snap, id);
+      if (res.problem === "ambiguous") {
+        return {
+          isError: true,
+          content: [{ type: "text", text: t("inspect.ambiguous", { id, lines: res.lineNos.join(", ") }) }],
+        };
+      }
+      if (res.problem) return notFoundResult(id, t);
+      return { content: [{ type: "text", text: JSON.stringify(res.record, null, 2) }] };
     }
   );
 

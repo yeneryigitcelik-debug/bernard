@@ -4,6 +4,19 @@
 // kanonik (İngilizce) kalır; yalnızca çevre metin Türkçeleşir.
 
 export const tr = {
+  "inspect.usage": "Kullanım: bernard goster <id> [--json] (tam olarak bir kayıt kimliği gerekir).",
+  "inspect.jsonNoValue": "--json değer almaz.",
+  "inspect.notInitialized": "{dir} konumunda bernard deposu bulunamadı. Önce `bernard init` çalıştırın.",
+  "inspect.notFound": "Kayıt bulunamadı: {id}",
+  "inspect.ambiguous": "{id} kimliğinin {lines} satırlarında çelişen kopyaları var. İncelemeden önce `bernard doctor` ile düzeltin.",
+  "inspect.state": "durum: {state}",
+  "inspect.stateActive": "etkin",
+  "inspect.stateInvalid": "geçersiz",
+  "inspect.stateReplaced": "yerine geçen kayıt bağlı",
+  "inspect.replacement": "yerine geçen: {id}",
+  "inspect.source": "kaynak: {source}",
+  "mcp.get.desc": "Tek bir kaydı tam kimliğiyle eksiksiz JSON olarak getirir; geçmiş dahildir (geçersiz veya yerine başkası geçmiş kayıtlar invalid/superseded_by alanlarını korur). Bir kaydı güncellemeden ya da geçersiz kılmadan önce incelemek için kullanın. Arama değildir.",
+  "mcp.list.includeInvalid": "Varsayılan true (geçmiş dahil). Yalnızca etkin kayıtlar için false verin; geçersiz veya yerine başkası geçmiş kayıtlar hariç tutulur.",
   "doctor.layout.root_unreadable": "{path} kökü incelenemiyor: {error}",
   "doctor.layout.unreadable": "{path} okunamıyor: {error}",
   "doctor.layout.missing_dir": "{path} konumunda hafıza başlatılmamış; doğru proje kökünde bernard init çalıştırın.",
@@ -262,6 +275,7 @@ Komutlar:
   add        (alias: ekle)      Yeni bir hafıza kaydı ekler
   search     (alias: ara)       Kayıtlarda arama yapar (BM25 tam-metin)
   list       (alias: listele)   Kayıtları (en yeni önce) listeler
+  show       (alias: goster)    Bir kaydı tam kimliğiyle eksiksiz incele [--json]
   invalidate (alias: gecersiz)  Bir kaydı geçersiz kılar (silmez)
   distill    (alias: damit)     Çelişkileri / geçersiz zincirleri çıkarır
   suggest    (alias: oner)      Son commit'lerden taslak kayıt önerir

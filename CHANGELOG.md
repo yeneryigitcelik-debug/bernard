@@ -8,10 +8,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Full read-only exact-ID inspection through `show` / `goster --json` and `bernard_get`, with explicit historical state and conservative duplicate-ID diagnostics.
+- An optional `include_invalid: false` MCP list filter for active records.
 - Read-only `doctor` / `doktor` integrity reports with bilingual messages, stable JSON diagnostics and documented exit codes; no automatic repair.
 
 ### Fixed
 
+- Show invalid/replacement state in MCP record snippets and replacement IDs in CLI history lists; reject unknown search/list type filters instead of reporting empty memory.
 - Keep expected CLI errors concise and finish interactive distill reports after per-record failures; reject empty read filters.
 - Respect effective Git ignore/attribute rules in doctor and distinguish unreadable files from missing ones.
 - Require initialization for new tag stores and keep category temporary files inside the ignored cache directory, preserving existing standalone category workflows.

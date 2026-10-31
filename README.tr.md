@@ -134,6 +134,28 @@ bernard list --type decision
 bernard list --tag auth
 ```
 
+Liste geçmişi de içerir; geçersiz kayıtları ve yerlerine geçen kimlikleri belirtir.
+Arama/liste tip filtreleri, bilinmeyen tipte sessizce boş sonuç dönmek yerine geçerli
+seçenekleri gösterir. Etiket filtresi tam eşleşme davranışını korur.
+
+### Kaydı eksiksiz incele
+
+```bash
+bernard show <kayit-id>
+bernard show <kayit-id> --json
+bernard goster <kayit-id> --json --locale tr
+```
+
+Arama veya listeden aldığınız tam kimlikle içeriğin tamamını okuyabilirsiniz.
+`show --json`, bilinmeyen alanlar, `invalid` ve `superseded_by` dahil yalnızca tam
+kaydı yazdırır; arama ve liste kısa görünümler olarak kalır. İnceleme geçmişi de
+içerir; kaydı güncel bağlam olarak kullanmadan veya güncellemeden önce durumuna bakın.
+Eksik depo oluşturulmaz, önbellek yeniden kurulmaz ve kayıt baytları değiştirilmez.
+
+Aynı kimliğin farklı kopyaları, biri geçersiz olsa bile tek bir kesin kayıt olarak
+incelenemez. `bernard doctor` çalıştırıp bildirilen satırları elle uzlaştırın.
+Özdeş kopyalar incelenebilir; hiçbir kopya onarılmaz veya silinmez.
+
 ### Geçersiz kıl
 
 ```bash
@@ -219,7 +241,7 @@ bernard install-hook --remove
 
 ## MCP entegrasyonu (ana yol)
 
-bernard'ın asıl gücü bir AI ajanına bağlanmasıdır. Bir **MCP sunucusu** olarak, ajanın otomatik kullandığı altı araç sunar — bir işe başlamadan önce geçmiş kararları arar, yenilerini kaydeder, eskiyenleri geçersiz kılar.
+bernard'ın asıl gücü bir AI ajanına bağlanmasıdır. Bir **MCP sunucusu** olarak, ajanın otomatik kullandığı yedi araç sunar — bir işe başlamadan önce geçmiş kararları arar, yenilerini kaydeder, eskiyenleri geçersiz kılar.
 
 Projenizin `.mcp.json` dosyasına ekleyin:
 
@@ -253,7 +275,8 @@ Sunucunun sunduğu araçlar:
 |------|----------|
 | **`bernard_search`** | Geçmiş kararları, mimari notları, çözülmüş bug'ları ve tercihleri arar. Anahtar araç — ajan işe başlamadan önce çağırır. |
 | **`bernard_add`** | Yeni kayıt ekler (`source: "agent"`); yazmadan önce şema doğrular. |
-| **`bernard_list`** | Kayıtları (isteğe bağlı tip/etiket filtresiyle) listeler. |
+| **`bernard_list`** | Kayıtları durumları ve yerlerine geçen kimliklerle, isteğe bağlı tip/etiket filtresiyle listeler. Geçmiş varsayılan olarak dahildir; `include_invalid: false`, geçersiz veya yerine geçen kayıt bağlı olanları eler. |
+| **`bernard_get`** | Tam `id` ile geçmiş durumu ve bütün alanları içeren eksiksiz JSON kaydını inceler. Salt okunurdur; farklı kopyalar elle uzlaştırılmalıdır. |
 | **`bernard_invalidate`** | Bir kaydı geçersiz kılar (`id`, opsiyonel `by`). Silmez, işaretler. |
 | **`bernard_update`** | Var olan bir kaydın alanlarını günceller; yalnızca verilen alanlar değişir. |
 | **`bernard_suggest`** | Son commit'leri + diff'leri getirir ki ajan kaydedilmeye değer kayıtları çıkarsın. |
