@@ -1,4 +1,5 @@
 import { buildIndex, score, tokenize } from "./bm25.js";
+import { isActive } from "./inspect.js";
 
 // Expand a query with the project's synonym groups. Token-based (not substring)
 // so "iz" never matches inside "deniz".
@@ -48,7 +49,7 @@ export function retrieve(query, records, opts = {}) {
 
   // Candidate set + filters.
   let candidates =
-    invalidMode === "drop" ? records.filter((r) => !r.invalid) : records.slice();
+    invalidMode === "drop" ? records.filter((r) => isActive(r)) : records.slice();
   if (type) candidates = candidates.filter((r) => r.type === type);
   if (tag)
     candidates = candidates.filter(
@@ -77,9 +78,9 @@ export function retrieve(query, records, opts = {}) {
 
   scored.sort((a, b) => {
     if (invalidMode === "mark") {
-      const ai = a.record.invalid ? 1 : 0;
-      const bi = b.record.invalid ? 1 : 0;
-      if (ai !== bi) return ai - bi; // invalid records sort LAST
+      const ai = !isActive(a.record) ? 1 : 0;
+      const bi = !isActive(b.record) ? 1 : 0;
+      if (ai !== bi) return ai - bi; // inactive (invalid/replaced) records sort LAST
     }
     if (b.final !== a.final) return b.final - a.final; // final desc
     const at = Date.parse(a.record.created) || 0;

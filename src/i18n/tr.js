@@ -4,6 +4,82 @@
 // kanonik (İngilizce) kalır; yalnızca çevre metin Türkçeleşir.
 
 export const tr = {
+  "inspect.usage": "Kullanım: bernard goster <id> [--json] (tam olarak bir kayıt kimliği gerekir).",
+  "inspect.jsonNoValue": "--json değer almaz.",
+  "inspect.notInitialized": "{dir} konumunda bernard deposu bulunamadı. Önce `bernard init` çalıştırın.",
+  "inspect.notFound": "Kayıt bulunamadı: {id}",
+  "inspect.ambiguous": "{id} kimliğinin {lines} satırlarında çelişen kopyaları var. İncelemeden önce `bernard doctor` ile düzeltin.",
+  "inspect.state": "durum: {state}",
+  "inspect.stateActive": "etkin",
+  "inspect.stateInvalid": "geçersiz",
+  "inspect.stateReplaced": "yerine geçen kayıt bağlı",
+  "inspect.replacement": "yerine geçen: {id}",
+  "inspect.source": "kaynak: {source}",
+  "mcp.get.desc": "Tek bir kaydı tam kimliğiyle eksiksiz JSON olarak getirir; geçmiş dahildir (geçersiz veya yerine başkası geçmiş kayıtlar invalid/superseded_by alanlarını korur). Bir kaydı güncellemeden ya da geçersiz kılmadan önce incelemek için kullanın. Arama değildir.",
+  "mcp.list.includeInvalid": "Varsayılan true (geçmiş dahil). Yalnızca etkin kayıtlar için false verin; geçersiz veya yerine başkası geçmiş kayıtlar hariç tutulur.",
+  "doctor.layout.root_unreadable": "{path} kökü incelenemiyor: {error}",
+  "doctor.layout.unreadable": "{path} okunamıyor: {error}",
+  "doctor.layout.missing_dir": "{path} konumunda hafıza başlatılmamış; doğru proje kökünde bernard init çalıştırın.",
+  "doctor.layout.missing_file": "Hafıza dosyası eksik: {file}.",
+  "doctor.layout.gitignore_cache": ".bernard/.cache yerel dizini açıkça ignore edilmemiş.",
+  "doctor.layout.gitattributes_union": "records.jsonl merge=union Git niteliği eksik.",
+  "doctor.layout.cache_tracked": "Türetilmiş önbellek dosyaları Git tarafından izleniyor.",
+  "doctor.records.invalid_utf8": "{lineNo}. satır geçersiz UTF-8 içeriyor. Özgün baytlar korundu.",
+  "doctor.records.corrupt_json": "{lineNo}. satır geçerli JSON değil.",
+  "doctor.records.schema_invalid": "{lineNo}. satır kayıt doğrulamasını geçemiyor: {errors}",
+  "doctor.records.duplicate_id": "{id} kimliği {lineNos} satırlarında yineleniyor. Geçersiz kopyalar hariç tutulur; çakışan aktif kopyalar karantinaya alınır.",
+  "doctor.records.no_trailing_newline": "Son satırda satır sonu karakteri yok.",
+  "doctor.records.mixed_eol": "Dosyada LF ve CRLF birlikte kullanılıyor; mevcut baytlar korundu.",
+  "doctor.graph.superseded_by_missing": "{lineNo}. satır: {id}, eksik {by} kaydına işaret ediyor.",
+  "doctor.graph.superseded_by_self": "{lineNo}. satır: {id} kendisini geçersizleştiriyor.",
+  "doctor.graph.cycle": "Geçersizleştirme döngüsü: {ids}",
+  "doctor.graph.valid_but_superseded": "{lineNo}. satır: {id} için yerine geçen kayıt var ama hâlâ geçerli işaretlenmiş.",
+  "doctor.config.unparseable": "config.json geçerli bir ayar nesnesi değil.",
+  "doctor.config.locale_unknown": "Bilinmeyen yapılandırılmış dil: {locale}",
+  "doctor.config.retrieval_range": "Geçersiz arama ayarları: {fields}",
+  "doctor.categories.unparseable": "categories.json geçerli bir nesne değil.",
+  "doctor.categories.types_diverge": "Kategoriler her standart kayıt türünü tam bir kez içermeli.",
+  "doctor.categories.synonyms_shape": "Eş anlamlılar anahtarları metin dizileriyle eşlemeli.",
+  "doctor.cache.version_mismatch": "Önbellek biçimi {actual} eski; güncel biçim {expected}.",
+  "doctor.cache.stale": "Arama önbelleği eksik veya eski; doktor yeniden oluşturmadı.",
+  "doctor.lock.present": "{path} konumunda depo kilidi var; sahip durumu: {state}. Kaldırılmadı.",
+  "doctor.lock.breaker_present": "{path} konumunda eski kilit açıcı var; kaldırılmadı.",
+  "doctor.hook.state": "Post-commit kancası durumu: {kind}",
+  "doctor.reconcile": "{lines} satırlarını inceleyip geçmişlerini elle uzlaştırın, sonra bernard doktor komutunu yeniden çalıştırın. Otomatik onarım yapılmaz.",
+  "doctor.summary": "{errors} hata, {warnings} uyarı, {infos} bilgi; {records} geçerli satır, {unique_ids} benzersiz kimlik, {quarantined_ids} karantinadaki kimlik.",
+
+  "store.duplicateLines": "\"{id}\" kimliği {lines} satırlarında yineleniyor; çakışan aktif kopyalar okumalardan çıkarılır. bernard doktor çalıştırıp bu satırları elle uzlaştırın.",
+  "store.ambiguousUpdate": "\"{id}\" kaydının çakışan kopyaları güncellenemez. bernard doktor çalıştırın, bildirilen satırları elle uzlaştırıp tekrar deneyin. Özgün baytlar değiştirilmedi.",
+  "cli.flagNeedsValue": "{flag} seçeneği boş olmayan bir değer gerektirir.",
+  "mcp.notInitialized": "{dir} konumunda hafıza başlatılmamış. Yazmadan önce doğru proje kökünde bernard init çalıştırın. Dosya oluşturulmadı.",
+  "add.notInitialized": "{dir} konumunda hafıza ayarları eksik; CLI add eski otomatik oluşturma davranışını korur. Ayarlar, kategoriler ve Git ignore/merge kuralları için bernard init çalıştırın.",
+  "distill.ttyHint": "--apply etkileşimli terminal gerektirir; hiçbir kayıt değiştirilmedi.",
+  "tags.unreadable": "{path} güvenle düzenlenemiyor/okunamıyor: {error}. Dosyayı elle düzeltin; mevcut kategoriler korundu.",
+
+  // Storage validation and concurrency diagnostics.
+  "store.invalidRecord": "Geçersiz kayıt: {errors}",
+  "store.invalidFingerprint": "Geçersiz beklenen parmak izi: kanonik bir kayıt parmak izi olmalıdır.",
+  "store.stalePlan": "Plan beklerken kayıtlar değişti. Bu adımdan hiçbir şey uygulanmadı; bernard distill komutunu yeniden çalıştırın.",
+  "store.invalidLine": "Geçersiz kayıt satırı atlanıyor: {line} ({errors})",
+  "store.invalidUtf8": "Geçersiz UTF-8 içeren satır atlanıyor ({bytes} bayt); orijinal baytlar korunuyor.",
+  "store.duplicateId": "\"{id}\" kimlikli bir kayıt zaten var.",
+  "store.patchNotObject": "Yama bir nesne olmalıdır.",
+  "store.idImmutable": "Kayıt kimliği değiştirilemez.",
+  "store.supersedeSelf": "\"{id}\" kaydı kendisinin yerine geçemez.",
+  "store.supersedeMissing": "Yerine geçecek \"{id}\" kaydı bulunamadı.",
+  "store.supersedeCycle": "\"{id}\" kaydının yerine \"{by}\" koymak bir döngü oluşturur.",
+  "store.lockOwnerUnknown": "bilinmeyen sahip",
+  "store.lockTimeout": "{path} depo kilidi için {ms} ms beklendikten sonra zaman aşımı (sahibi: {owner}).",
+  "store.lockGarbled": "{ms} ms sonra zaman aşımı: {path} kilit dosyasının içeriği okunamıyor ve sahibi belirlenemiyor. Çalışan bir bernard işlemi yoksa {path} dosyasını elle silin.",
+  "store.lockBreakerStuck": "{ms} ms sonra zaman aşımı: {path} eski kilit kırıcı dosyası mevcut (sahibi: {owner}). Bu dosya asla otomatik silinmez. Çalışan bir bernard işlemi yoksa {path} dosyasını (ve sahibi ölmüşse {lock} dosyasını) elle silin.",
+  "store.lockLost": "{path} depo kilidi bırakılırken artık bize ait değildi.",
+  "schema.idRequired": "Kimlik zorunludur ve boş olmayan bir metin olmalıdır.",
+  "schema.createdInvalid": "Oluşturulma tarihi geçerli bir tarih metni olmalıdır.",
+  "schema.invalidBoolean": "invalid alanı mantıksal (boolean) bir değer olmalıdır.",
+  "schema.supersededByInvalid": "superseded_by null ya da boş olmayan bir metin olmalıdır.",
+  "schema.sourceString": "Kaynak bir metin olmalıdır.",
+  "store.indexWriteFailed": "Yerel arama dizini yazılamadı: {error}",
+
   // --- ortak ---
   "common.noGitRepo": "Git deposu bulunamadı; geçerli dizin kullanılıyor.",
   "common.corruptLine": "Bozuk satır atlandı: {line}",
@@ -201,10 +277,12 @@ Komutlar:
   add        (alias: ekle)      Yeni bir hafıza kaydı ekler
   search     (alias: ara)       Kayıtlarda arama yapar (BM25 tam-metin)
   list       (alias: listele)   Kayıtları (en yeni önce) listeler
+  show       (alias: goster)    Bir kaydı tam kimliğiyle eksiksiz incele [--json]
   invalidate (alias: gecersiz)  Bir kaydı geçersiz kılar (silmez)
   distill    (alias: damit)     Çelişkileri / geçersiz zincirleri çıkarır
   suggest    (alias: oner)      Son commit'lerden taslak kayıt önerir
   install-hook (alias: kanca-kur)  post-commit hatırlatıcı kancasını kurar/kaldırır
+  doctor (doktor)              Salt okunur bütünlük kontrolü [--json]; çıkış: 0 sağlıklı, 1 uyarı, 2 hata, 3 çalıştırılamadı
   stats      (alias: istatistik)   Özet panosunu gösterir
   tags       (alias: etiketler)    Tip / eş anlamlı gruplarını yönetir
   mcp                           MCP sunucusunu (stdio) başlatır
@@ -233,6 +311,7 @@ Seçenekler:
   bernard invalidate ber_abc123 --by ber_def456
   bernard distill --apply
   bernard suggest --add
+  bernard doctor --json
   bernard stats
   bernard tags --add "auth=giris,oturum"
   bernard install-hook

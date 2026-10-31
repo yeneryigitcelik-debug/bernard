@@ -134,6 +134,28 @@ bernard list --type decision
 bernard list --tag auth
 ```
 
+Liste geçmişi de içerir; geçersiz kayıtları ve yerlerine geçen kimlikleri belirtir.
+Arama/liste tip filtreleri, bilinmeyen tipte sessizce boş sonuç dönmek yerine geçerli
+seçenekleri gösterir. Etiket filtresi tam eşleşme davranışını korur.
+
+### Kaydı eksiksiz incele
+
+```bash
+bernard show <kayit-id>
+bernard show <kayit-id> --json
+bernard goster <kayit-id> --json --locale tr
+```
+
+Arama veya listeden aldığınız tam kimlikle içeriğin tamamını okuyabilirsiniz.
+`show --json`, bilinmeyen alanlar, `invalid` ve `superseded_by` dahil yalnızca tam
+kaydı yazdırır; arama ve liste kısa görünümler olarak kalır. İnceleme geçmişi de
+içerir; kaydı güncel bağlam olarak kullanmadan veya güncellemeden önce durumuna bakın.
+Eksik depo oluşturulmaz, önbellek yeniden kurulmaz ve kayıt baytları değiştirilmez.
+
+Aynı kimliğin farklı kopyaları, biri geçersiz olsa bile tek bir kesin kayıt olarak
+incelenemez. `bernard doctor` çalıştırıp bildirilen satırları elle uzlaştırın.
+Özdeş kopyalar incelenebilir; hiçbir kopya onarılmaz veya silinmez.
+
 ### Geçersiz kıl
 
 ```bash
@@ -142,6 +164,8 @@ bernard invalidate ber_abc123 --by ber_def456
 ```
 
 Bir kaydı **silmeden** geçersiz işaretler (`invalid: true`). `--by` ile onu güncelleyen yeni kaydı bağlarsınız; böylece karar geçmişi korunur. Arama, geçersiz kayıtları varsayılan olarak eler.
+
+Boş olmayan bir `superseded_by` bağlantısı da kaydı geçmiş sayar; eski veya birleştirilmiş satırda `invalid: false` kalmış olsa bile. Arama bu kaydı eler; tam inceleme ve varsayılan geçmiş listesi satırın tamamını ve yerine geçen kimliği korur. Damıtma mevcut bağlantıyı gösterir, fakat yerini başka kayıt almış satırı güncel karar olarak tutmayı önermez. Bu okumalar bayrakları düzeltmez veya kayıtları yeniden yazmaz; tutarsız veri için `doctor` kullanın.
 
 Eski bir kararı doğrudan geçersiz kılan yeni bir kayıt eklemek için:
 
@@ -158,7 +182,28 @@ bernard distill
 bernard distill --apply
 ```
 
-Olası çelişkileri (aynı tip + etiket grubunda birden çok kayıt), geçersiz zincirlerini ve önerileri gösterir. Her çelişki için **en yenisini tut, diğerlerini geçersiz kıl** önerir ve çalıştırmaya hazır `bernard invalidate … --by …` komutları üretir. `--apply` (TTY) bunları etkileşimli uygular. **Hiçbir şeyi silmez** — yalnızca işaretler ve önerir.
+Olası çelişkileri (aynı tip + boş olmayan etiket grubunda birden çok kayıt), geçersiz zincirlerini ve önerileri gösterir. Etiketsiz kayıtlar ve ayrı `bug` olayları çakışma önerilerinden hariç tutulur; ortak tür/etiket tek başına çelişki kanıtı değildir. Her çelişki için **en yenisini tut, diğerlerini geçersiz kıl** önerir ve çalıştırmaya hazır `bernard invalidate … --by …` komutları üretir. `--apply` (TTY) bunları etkileşimli uygular. **Hiçbir şeyi silmez** — yalnızca işaretler ve önerir.
+
+Etkileşimli uygulama, kayıtların gösterilen planla hâlâ eşleştiğini yazma kilidi altında denetler. İlgisiz bir kayıt eklenmesi dahil dışarıdan yapılan herhangi bir değişiklik, kalan oturumu durdurur ve `bernard distill` komutunu yeniden çalıştırmanızı ister. Daha önce onaylanıp kaydedilmiş değişiklikler korunur ve sonuç özetinde doğru sayılır; reddedilen adım hiçbir şey yazmaz. Siz karar verirken kilit tutulmaz. Bu kontrol Bernard'ın ortak yazma kilidini kullanan işlemler içindir; kilidi atlayan programlara karşı dosya sistemi garantisi değildir. Doğrudan `bernard invalidate` komutlarının mevcut davranışı korunur.
+
+### Bütünlük kontrolü (salt okunur)
+
+```bash
+bernard doctor
+bernard doctor --json
+bernard doktor --locale tr
+```
+
+Kaynak satırlarını, yinelenen kimlikleri, geçersizleştirme bağlantılarını/döngülerini,
+ayarları, kategorileri, Git ignore/merge kurallarını, izlenen önbelleği, önbellek
+geçerliliğini, kilitleri ve kanca sahipliğini denetler. Kayıtları onarmaz; kilit almaz
+veya kaldırmaz; depo/önbellek oluşturmaz. JSON çıktısı `schema: 1`, `summary`, sabit
+İngilizce tanı `id` alanları, yerelleştirilmiş mesajlar, satır numaraları ve `exitCode`
+içerir. Çıkış kodları: **0** sağlıklı (yalnız bilgi), **1** uyarı, **2** veri/yapı
+hatası, **3** kök okunamıyor. `summary.records` geçerli fiziksel satırları sayar;
+`unique_ids` ve `quarantined_ids` tekrarları açıkça gösterir. Bildirilen yinelenen
+satırları inceleyip geçmişlerini elle uzlaştırın, ardından `doktor` komutunu yeniden
+çalıştırın. Otomatik onarım veya silme yapılmaz.
 
 ### İstatistik
 
@@ -177,6 +222,8 @@ bernard tags --remove "auth"
 ```
 
 `categories.json` içindeki tipleri ve eş anlamlı gruplarını listeler/düzenler. Eş anlamlılar arama sırasında sorgu genişletmeyi besler; takımın söz dağarcığı takımın geri çağırma gücü olur.
+
+Yeni projelerde etiketleri düzenlemeden önce `init` çalıştırılır. Önceki sürümlerden kalan bağımsız `categories.json` dosyaları uyumluluk için düzenlenebilir.
 
 ### Öner (commit'lerden taslak)
 
@@ -198,7 +245,7 @@ bernard install-hook --remove
 
 ## MCP entegrasyonu (ana yol)
 
-bernard'ın asıl gücü bir AI ajanına bağlanmasıdır. Bir **MCP sunucusu** olarak, ajanın otomatik kullandığı altı araç sunar — bir işe başlamadan önce geçmiş kararları arar, yenilerini kaydeder, eskiyenleri geçersiz kılar.
+bernard'ın asıl gücü bir AI ajanına bağlanmasıdır. Bir **MCP sunucusu** olarak, ajanın otomatik kullandığı yedi araç sunar — bir işe başlamadan önce geçmiş kararları arar, yenilerini kaydeder, eskiyenleri geçersiz kılar.
 
 Projenizin `.mcp.json` dosyasına ekleyin:
 
@@ -232,7 +279,8 @@ Sunucunun sunduğu araçlar:
 |------|----------|
 | **`bernard_search`** | Geçmiş kararları, mimari notları, çözülmüş bug'ları ve tercihleri arar. Anahtar araç — ajan işe başlamadan önce çağırır. |
 | **`bernard_add`** | Yeni kayıt ekler (`source: "agent"`); yazmadan önce şema doğrular. |
-| **`bernard_list`** | Kayıtları (isteğe bağlı tip/etiket filtresiyle) listeler. |
+| **`bernard_list`** | Kayıtları durumları ve yerlerine geçen kimliklerle, isteğe bağlı tip/etiket filtresiyle listeler. Geçmiş varsayılan olarak dahildir; `include_invalid: false`, geçersiz veya yerine geçen kayıt bağlı olanları eler. |
+| **`bernard_get`** | Tam `id` ile geçmiş durumu ve bütün alanları içeren eksiksiz JSON kaydını inceler. Salt okunurdur; farklı kopyalar elle uzlaştırılmalıdır. |
 | **`bernard_invalidate`** | Bir kaydı geçersiz kılar (`id`, opsiyonel `by`). Silmez, işaretler. |
 | **`bernard_update`** | Var olan bir kaydın alanlarını günceller; yalnızca verilen alanlar değişir. |
 | **`bernard_suggest`** | Son commit'leri + diff'leri getirir ki ajan kaydedilmeye değer kayıtları çıkarsın. |
@@ -283,6 +331,25 @@ bernard bilgiyi asla silmez; eskiyen kararları **geçersizleştirir** ve geçmi
 
 Her kayıt, ekleme-öncelikli bir dosyada bağımsız bir satır olduğundan, iki dal farklı kayıtlar eklediğinde git iki tarafı **birleştirir** (union) — böylece aynı anda hafızaya yazan takım üyeleri gereksiz merge çatışmaları yaşamaz.
 
+Bir dal satırı güncellerken diğer dal yakınına kayıt eklerse union merge aynı kimliği
+**birden fazla satırda** bırakabilir. Bernard bütün kaynak baytlarını korur ve satır
+numaralarını bildirir: aynı kopyalar bir kez sayılır; herhangi bir kopya geçersizse o
+kimlik aramada hariç kalır. Farklı kopyaların hepsi aktifse rastgele bir dalın içeriği
+seçilmez; kimlik **arama, liste, istatistik ve distill sonuçlarından karantinaya alınır**.
+CLI okumaları stderr'e uyarı yazar; MCP arama/liste yanıtları da tanıyı içerir.
+Çakışan kopyalar güncellenemez; diğer kayıtlar kullanılmaya devam eder. Aynı kopyalara
+açık bir yama her kopyayı kendi satır sonunu koruyarak günceller. `bernard doktor`
+çalıştırın ve yinelenen satırları elle uzlaştırın; okumalar dosyayı yeniden yazmaz.
+Önbellek biçimi 3, JSONL parmak izi değişmese de eski indeksleri geçersiz sayar.
+
+Okuma komutları eksik depoyu oluşturmaz. MCP yazmaları mevcut kayıt dosyası gerektirir;
+sunucuyu doğru proje kökünde başlatın ve önce orada `bernard init` çalıştırın. CLI `add`,
+ayarlar ve Git kuralları için `init` uyarısı vererek önceki otomatik oluşturma davranışını
+korur. `add --supersedes`, yeni kaydı ekleme ve eskiyi geçersizleştirme işlemlerini tek
+kilitli, atomik yazmayla yapar. `--by` olmadan tekrar geçersizleştirme mevcut yerine geçen
+kayıt bağlantısını korur. Distill, etiketsiz kayıtları ve ayrı `bug` olaylarını çakışma
+önerilerine dahil etmez; tür/etiket ortaklığı tek başına çelişki kanıtı değildir.
+
 ## Mimari: neyin commit edildiği, neyin yerel kaldığı
 
 ```
@@ -300,6 +367,8 @@ projeniz/
 ```
 
 **Commit edilir:** `records.jsonl`, `categories.json`, `config.json`. Hafıza koddur — paylaşılmalı, review edilmeli ve git geçmişiyle versiyonlanmalı.
+
+**Yerel yazımlar:** Aynı çalışma kopyasındaki CLI ve MCP yazıcıları ortak kilit kullanır; JSONL atomik olarak değiştirilir. Eşzamanlı yazıcılar sınırlı süre bekler, etkin kilit zorla alınmaz. Bu mekanizma farklı bilgisayarları koordine etmez ve Git birleştirme çatışmalarını çözmez. Bozuk veya geçersiz satırlar aramada atlanır, elle onarım için diskte korunur.
 
 **Yerel kalır:** `.bernard/.cache/`. BM25 `index.json` tamamen `records.jsonl`'dan türetilebilir (kayıtlar veya locale değişince otomatik yeniden kurulur). Türetilmiş veriyi commit etmek yalnızca anlamsız çatışmalar yaratır.
 
@@ -352,10 +421,10 @@ Getirme de locale-duyarlıdır: Türkçe için muhafazakâr bir stemmer (`tokenl
 
 ## Katkı
 
-Katkılar memnuniyetle karşılanır — bkz. [CONTRIBUTING.md](CONTRIBUTING.md). Proje bilerek bağımlılık-hafiftir (yalnızca sunucu için MCP SDK + zod) ve bağımlılıksız bir smoke test ile gelir:
+Katkılar memnuniyetle karşılanır — bkz. [CONTRIBUTING.md](CONTRIBUTING.md). Proje bilerek bağımlılık-hafiftir (yalnızca sunucu için MCP SDK + zod) ve çevrimdışı smoke testlerinin yanında kayıt, arama, hook ve gerçek MCP protokol regresyonlarını içerir:
 
 ```bash
-npm install
+npm ci
 npm test
 ```
 

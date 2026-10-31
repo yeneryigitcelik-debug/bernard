@@ -1,108 +1,141 @@
 import fs from "node:fs";
 import path from "node:path";
 import { findRepoRoot, bernardDir } from "../core/paths.js";
-import { isGitRepo } from "../util/git.js";
+import { isGitRepo, gitHookPath } from "../util/git.js";
 import { log } from "../util/log.js";
-import { getT } from "../i18n/index.js";
+import { getT, makeT } from "../i18n/index.js";
 
-// Identifies a hook installed by bernard.
-const MARKER = "# bernard";
+// Explicit managed-block markers. Only an exact, owned block is ever removed.
+export const BEGIN = "# >>> bernard managed block >>>";
+export const END = "# <<< bernard managed block <<<";
+const LEGACY_MARKER = "# bernard";
 
-function hookContent(reminder) {
-  return [
+const shq = (s) => "'" + String(s).replace(/'/g, "'\\''") + "'";
+export const managedBlock = (r) => `${BEGIN}\necho ${shq(r)} 1>&2\n${END}\n`;
+const fullHook = (r) => "#!/bin/sh\n" + managedBlock(r);
+// Exact template written by older bernard versions (removable only on exact match).
+export const legacyHook = (r) =>
+  [
     "#!/bin/sh",
-    MARKER,
+    LEGACY_MARKER,
     "# bernard post-commit hook: remind to extract record suggestions.",
-    `echo "${reminder}" 1>&2`,
+    `echo "${r}" 1>&2`,
     "",
   ].join("\n");
+
+const errMsg = (e) => (e && e.message ? e.message : String(e));
+const count = (s, sub) => s.split(sub).length - 1;
+
+export function classify(content, current) {
+  const legacy = [makeT("en")("hook.reminder"), makeT("tr")("hook.reminder")];
+  const known = [...new Set([current, ...legacy])];
+  if (legacy.some((r) => content === legacyHook(r))) return { kind: "legacy" };
+  if (known.some((r) => content === fullHook(r))) return { kind: "full" };
+  if (count(content, BEGIN) === 1 && count(content, END) === 1) {
+    for (const r of known) {
+      const b = managedBlock(r);
+      const i = content.indexOf(b);
+      if (i >= 0 && (i === 0 || content[i - 1] === "\n")) return { kind: "block", start: i, len: b.length };
+    }
+  }
+  return { kind: "foreign" };
 }
 
-function snippet(reminder) {
-  return ["", "  " + MARKER, `  echo "${reminder}" 1>&2`, ""].join("\n");
+// null = missing; {content} = regular file; {} = symlink/other (never touched).
+function inspect(hook) {
+  let st;
+  try {
+    st = fs.lstatSync(hook);
+  } catch (e) {
+    if (e && e.code === "ENOENT") return null;
+    throw e;
+  }
+  if (!st.isFile()) return {};
+  return { content: fs.readFileSync(hook, "utf8") };
 }
+
+const kindOf = (cur, reminder) =>
+  typeof cur.content === "string" ? classify(cur.content, reminder) : { kind: "foreign" };
 
 export async function installHook(parsed) {
   const root = findRepoRoot();
-  const dir = bernardDir(root);
-  const t = getT(dir);
+  const t = getT(bernardDir(root));
   const reminder = t("hook.reminder");
+  const fail = (key, outKey, e) => {
+    log.error(t(key, { error: errMsg(e) }));
+    console.log(t(outKey));
+    process.exitCode = 1;
+  };
 
-  if (!isGitRepo(root)) {
+  const hook = isGitRepo(root) ? gitHookPath(root, "post-commit") : null;
+  if (!hook) {
     log.warn(t("hook.notGitRepo"));
     console.log(t("hook.notGitRepoOut"));
     process.exitCode = 1;
     return;
   }
 
-  const hooksDir = path.join(root, ".git", "hooks");
-  const hook = path.join(hooksDir, "post-commit");
-  const remove = !!parsed.flags.remove;
-
-  // --remove: only remove a hook that bernard installed.
-  if (remove) {
-    if (!fs.existsSync(hook)) {
+  if (parsed.flags.remove) {
+    let cur;
+    try {
+      cur = inspect(hook);
+    } catch (e) {
+      return fail("hook.removeFailed", "hook.removeFailedOut", e);
+    }
+    if (!cur) {
       console.log(t("hook.removeNone"));
       log.dim(t("hook.removeNoneDim"));
       return;
     }
-    let existing = "";
-    try {
-      existing = fs.readFileSync(hook, "utf8");
-    } catch {
-      existing = "";
-    }
-    if (!existing.includes(MARKER)) {
+    const c = kindOf(cur, reminder);
+    if (c.kind === "foreign") {
       log.warn(t("hook.removeNotOurs"));
       console.log(t("hook.removeNotOursOut"));
       return;
     }
     try {
-      fs.rmSync(hook);
+      if (c.kind === "block") {
+        fs.writeFileSync(hook, cur.content.slice(0, c.start) + cur.content.slice(c.start + c.len), "utf8");
+      } else {
+        fs.rmSync(hook);
+      }
     } catch (e) {
-      log.error(t("hook.removeFailed", { error: e && e.message ? e.message : String(e) }));
-      console.log(t("hook.removeFailedOut"));
-      process.exitCode = 1;
-      return;
+      return fail("hook.removeFailed", "hook.removeFailedOut", e);
     }
     console.log(t("hook.removed", { path: hook }));
     log.success(t("hook.removeSuccess"));
     return;
   }
 
-  // Install: do not overwrite an existing non-bernard hook.
-  if (fs.existsSync(hook)) {
-    let existing = "";
-    try {
-      existing = fs.readFileSync(hook, "utf8");
-    } catch {
-      existing = "";
-    }
-    if (existing.includes(MARKER)) {
-      console.log(t("hook.alreadyInstalled", { path: hook }));
-      log.dim(t("hook.noChange"));
-      return;
-    }
-    log.warn(t("hook.existsNotOurs"));
-    console.log(t("hook.existsOut", { path: hook }));
-    console.log(t("hook.snippetIntro"));
-    console.log(snippet(reminder));
-    return;
-  }
-
-  // Write a new hook and make it executable.
-  if (!fs.existsSync(hooksDir)) fs.mkdirSync(hooksDir, { recursive: true });
+  let cur;
   try {
-    fs.writeFileSync(hook, hookContent(reminder), "utf8");
-    fs.chmodSync(hook, 0o755);
+    cur = inspect(hook);
+    if (!cur) {
+      fs.mkdirSync(path.dirname(hook), { recursive: true });
+      try {
+        // Exclusive create: never clobber a hook that appeared concurrently.
+        fs.writeFileSync(hook, fullHook(reminder), { encoding: "utf8", flag: "wx", mode: 0o755 });
+        fs.chmodSync(hook, 0o755);
+        console.log(t("hook.installed", { path: hook }));
+        console.log(t("hook.installedHint"));
+        log.success(t("hook.success"));
+        return;
+      } catch (e) {
+        if (!e || e.code !== "EEXIST") throw e;
+        cur = inspect(hook) || {};
+      }
+    }
   } catch (e) {
-    log.error(t("hook.installFailed", { error: e && e.message ? e.message : String(e) }));
-    console.log(t("hook.installFailedOut"));
-    process.exitCode = 1;
-    return;
+    return fail("hook.installFailed", "hook.installFailedOut", e);
   }
 
-  console.log(t("hook.installed", { path: hook }));
-  console.log(t("hook.installedHint"));
-  log.success(t("hook.success"));
+  if (kindOf(cur, reminder).kind !== "foreign") {
+    console.log(t("hook.alreadyInstalled", { path: hook }));
+    log.dim(t("hook.noChange"));
+    return;
+  }
+  log.warn(t("hook.existsNotOurs"));
+  console.log(t("hook.existsOut", { path: hook }));
+  console.log(t("hook.snippetIntro"));
+  console.log(managedBlock(reminder));
 }

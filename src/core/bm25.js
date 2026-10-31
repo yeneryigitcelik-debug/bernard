@@ -69,21 +69,32 @@ export function tokenize(text, locale = "en") {
   return locale === "tr" ? tokens.map(stemTr) : tokens;
 }
 
+const hasOwn = (obj, key) =>
+  obj != null && typeof obj === "object" && Object.prototype.hasOwnProperty.call(obj, key);
+
+// Own-key numeric lookup: ignores inherited keys like "constructor" even after JSON roundtrip.
+function ownNum(obj, key) {
+  if (!hasOwn(obj, key)) return 0;
+  const v = obj[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
 export function recordText(record) {
   const title = record?.title ?? "";
   const content = record?.content ?? "";
-  const tags = record?.tags || [];
+  const tags = Array.isArray(record?.tags) ? record.tags : [];
   return `${title} ${content} ${tags.join(" ")}`;
 }
 
 export function buildIndex(records, locale = "en") {
   const docs = [];
-  const df = {};
+  const df = Object.create(null);
   let totalLen = 0;
 
-  for (const record of records) {
+  for (const record of Array.isArray(records) ? records : []) {
+    if (!record || typeof record !== "object") continue;
     const tokens = tokenize(recordText(record), locale);
-    const tf = {};
+    const tf = Object.create(null);
     for (const tok of tokens) tf[tok] = (tf[tok] || 0) + 1;
     const len = tokens.length;
     totalLen += len;
@@ -100,17 +111,18 @@ export function buildIndex(records, locale = "en") {
 
 export function score(queryTokens, index, docId) {
   if (!index || !Array.isArray(index.docs)) return 0;
-  const doc = index.docs.find((d) => d.id === docId);
-  if (!doc) return 0;
+  const doc = index.docs.find((d) => d && typeof d === "object" && d.id === docId);
+  if (!doc || !doc.tf || typeof doc.tf !== "object") return 0;
 
-  const { N, avgdl, df } = index;
+  const { N, avgdl } = index;
+  const df = index.df && typeof index.df === "object" ? index.df : {};
   const uniqueTerms = [...new Set(queryTokens)];
 
   let total = 0;
   for (const term of uniqueTerms) {
-    const f = doc.tf[term];
+    const f = ownNum(doc.tf, term);
     if (!f) continue;
-    const n = df[term] || 0;
+    const n = ownNum(df, term);
     const idf = Math.log(1 + (N - n + 0.5) / (n + 0.5));
     const denom = f + K1 * (1 - B + B * (avgdl > 0 ? doc.len / avgdl : 0));
     total += idf * ((f * (K1 + 1)) / denom);

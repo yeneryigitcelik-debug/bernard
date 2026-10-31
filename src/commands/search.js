@@ -1,15 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { findRepoRoot, bernardDir } from "../core/paths.js";
-import { readRecords } from "../core/store.js";
+import { readSnapshot } from "../core/store.js";
 import { ensureIndex } from "../core/index-cache.js";
 import { retrieve } from "../core/retrieve.js";
 import { log } from "../util/log.js";
+import { TYPES } from "../util/schema.js";
 import { getT, resolveLocale, localeFromConfig } from "../i18n/index.js";
 
 function readJsonSafe(file, fallback) {
   try {
-    return JSON.parse(fs.readFileSync(file, "utf8"));
+    const data = JSON.parse(fs.readFileSync(file, "utf8"));
+    return data && typeof data === "object" && !Array.isArray(data) ? data : fallback;
   } catch {
     return fallback;
   }
@@ -29,12 +31,30 @@ function shortContent(content, n = 140) {
   return s.length <= n ? s : s.slice(0, n).trimEnd() + "…";
 }
 
+function valuelessFilter(flags) {
+  return ["type", "tag", "tags"].find((k) => Object.hasOwn(flags, k) &&
+    (flags[k] === true || (typeof flags[k] === "string" && flags[k].trim() === ""))) || null;
+}
+
 export async function search(parsed) {
   const { _ = [], flags = {} } = parsed || {};
   const root = findRepoRoot();
   const dir = bernardDir(root);
   const locale = resolveLocale({ flag: flags.locale, config: localeFromConfig(dir) });
   const t = getT(dir, flags.locale);
+
+  const bad = valuelessFilter(flags);
+  if (bad) {
+    log.error(t("cli.flagNeedsValue", { flag: `--${bad}` }));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (typeof flags.type === "string" && !TYPES.includes(flags.type)) {
+    log.error(t("schema.invalidType", { type: flags.type, types: TYPES.join(", ") }));
+    process.exitCode = 1;
+    return;
+  }
 
   const query = _.join(" ").trim();
   if (!query) {
@@ -60,15 +80,17 @@ export async function search(parsed) {
       ? flags.tags
       : null;
 
-  // Refresh the index (mtime/locale-based) and pass the full-corpus index in.
+  // Take one snapshot so record bodies and the index come from the same bytes;
+  // the index is refreshed by fingerprint/locale and passed in.
+  const snap = readSnapshot(dir);
+  const records = snap.records;
   let idx = null;
   try {
-    idx = ensureIndex(dir, locale);
+    idx = ensureIndex(dir, locale, snap);
   } catch (e) {
     log.warn(t("search.indexFailed", { error: e.message }));
   }
 
-  const records = readRecords(dir);
   const res = retrieve(query, records, {
     index: idx,
     synonyms,

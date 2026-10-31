@@ -31,13 +31,18 @@ export async function invalidate(parsed) {
   }
 
   const by = asString(flags.by);
+  if (Object.hasOwn(flags, "by") && by === undefined) {
+    log.error(t("cli.flagNeedsValue", { flag: "--by" }));
+    process.exitCode = 1;
+    return;
+  }
   if (by != null && !records.find((r) => r.id === by)) {
     log.error(t("invalidate.byNotFound", { id: by }));
     process.exitCode = 1;
     return;
   }
 
-  updateRecord(dir, id, { invalid: true, superseded_by: by || null });
+  updateRecord(dir, id, { invalid: true, ...(by !== undefined ? { superseded_by: by } : {}) });
 
   if (by) {
     console.log(t("invalidate.doneBy", { id, title: target.title, by }));

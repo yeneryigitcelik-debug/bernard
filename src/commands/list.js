@@ -4,6 +4,8 @@
 import { findRepoRoot, bernardDir } from "../core/paths.js";
 import { readRecords } from "../core/store.js";
 import { getT } from "../i18n/index.js";
+import { log } from "../util/log.js";
+import { TYPES } from "../util/schema.js";
 
 function badge(type) {
   return `[${String(type || "?").toUpperCase()}]`;
@@ -17,10 +19,28 @@ function formatDate(iso) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+function valuelessFilter(flags) {
+  return ["type", "tag", "tags"].find((k) => Object.hasOwn(flags, k) &&
+    (flags[k] === true || (typeof flags[k] === "string" && flags[k].trim() === ""))) || null;
+}
+
 export async function list(parsed) {
   const flags = parsed.flags || {};
   const dir = bernardDir(findRepoRoot());
   const t = getT(dir);
+
+  const bad = valuelessFilter(flags);
+  if (bad) {
+    log.error(t("cli.flagNeedsValue", { flag: `--${bad}` }));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (typeof flags.type === "string" && !TYPES.includes(flags.type)) {
+    log.error(t("schema.invalidType", { type: flags.type, types: TYPES.join(", ") }));
+    process.exitCode = 1;
+    return;
+  }
 
   let records = readRecords(dir);
 
@@ -51,7 +71,8 @@ export async function list(parsed) {
   for (const r of records) {
     const tags =
       Array.isArray(r.tags) && r.tags.length ? `  #${r.tags.join(" #")}` : "";
-    const invalidNote = r.invalid ? `  ${t("list.invalid")}` : "";
+    const invalidNote = (r.invalid ? `  ${t("list.invalid")}` : "") +
+      (r.superseded_by ? `  ${t("inspect.replacement", { id: String(r.superseded_by) })}` : "");
     console.log(`${badge(r.type)} ${r.title}${invalidNote}`);
     console.log(`  ${r.id}  ${formatDate(r.created)}${tags}`);
   }

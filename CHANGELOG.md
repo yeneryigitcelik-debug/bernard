@@ -6,6 +6,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Full read-only exact-ID inspection through `show` / `goster --json` and `bernard_get`, with explicit historical state and conservative duplicate-ID diagnostics.
+- An optional `include_invalid: false` MCP list filter for active records.
+- Read-only `doctor` / `doktor` integrity reports with bilingual messages, stable JSON diagnostics and documented exit codes; no automatic repair.
+
+### Fixed
+
+- Use the same active-record policy for recall and distill: legacy replacement-linked rows stay out of current results/proposals while their complete history and replacement edges remain readable without rewriting data.
+- Refuse stale interactive distill plans under the writer lock, preserving concurrent edits and reporting any earlier successful steps accurately.
+- Show invalid/replacement state in MCP record snippets and replacement IDs in CLI history lists; reject unknown search/list type filters instead of reporting empty memory.
+- Keep expected CLI errors concise and finish interactive distill reports after per-record failures; reject empty read filters.
+- Respect effective Git ignore/attribute rules in doctor and distinguish unreadable files from missing ones.
+- Require initialization for new tag stores and keep category temporary files inside the ignored cache directory, preserving existing standalone category workflows.
+
+- Prevent union-merge duplicate IDs from resurrecting invalid records; quarantine conflicting active copies, report their lines and retain every source segment. Bump derived cache format to 3.
+- Preserve supersession provenance on invalidation retries; make `add --supersedes` one atomic transaction.
+- Keep uninitialized reads free of writes and reject MCP writes without a memory store.
+- Refuse destructive category fallbacks and serialize atomic synonym edits.
+- Limit distill proposals to tagged non-bug cohorts and compare timestamps chronologically.
+- Parse Git commit metadata separately from NUL-delimited file lists, preserving merge/empty commit bodies and marking truncated diffs.
+
+- Serialize local record writers and atomically replace JSONL to preserve concurrent additions and updates; retain malformed source lines for manual repair.
+- Validate full MCP record updates and skip malformed records during retrieval.
+- Handle prototype-like query tokens and rebuild incompatible or stale search caches.
+- Resolve Git hook paths through Git for linked worktrees and `core.hooksPath`; remove only recognized managed content and preserve custom or symlinked hooks.
+- Create initial memory files exclusively so `init` cannot overwrite a concurrent first record.
+- Update vulnerable dependencies, including Zod 4; exercise the real MCP protocol in regression tests.
+
 ## [0.1.0] - 2026-06-29
 
 Initial public release of **bernard** (`bernard-mcp`): repo-committed,

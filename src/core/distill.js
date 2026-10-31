@@ -2,6 +2,8 @@
 // No mutation, no deletion. Human-readable suggestions are rendered by the
 // caller (so they can be localized); core returns structured data only.
 
+import { isActive } from "./inspect.js";
+
 export function distill(records) {
   const list = Array.isArray(records) ? records : [];
 
@@ -11,12 +13,13 @@ export function distill(records) {
     if (rec && rec.id != null) byId.set(rec.id, rec);
   }
 
-  // Group non-invalid records by type + sorted tags.
+  // Group active records (not invalid, no replacement link) by type + sorted tags.
   const groups = new Map();
   for (const rec of list) {
-    if (!rec || rec.invalid) continue;
+    if (!rec || !isActive(rec) || rec.type === "bug") continue;
     const tags = Array.isArray(rec.tags) ? rec.tags : [];
-    const key = `${rec.type}|${[...tags].sort().join(",")}`;
+    if (!tags.length) continue; // Sharing a type alone does not imply a conflict.
+    const key = JSON.stringify([rec.type, [...tags].sort()]);
     if (!groups.has(key)) {
       groups.set(key, { type: rec.type, tags: [...tags].sort(), ids: [] });
     }
@@ -34,17 +37,19 @@ export function distill(records) {
         const b = byId.get(keep);
         const ta = a && a.created ? a.created : "";
         const tb = b && b.created ? b.created : "";
-        if (ta > tb) keep = id;
+        const da = Date.parse(ta), db = Date.parse(tb);
+        if (Number.isFinite(da) && Number.isFinite(db) ? da > db : ta > tb) keep = id;
       }
       const toInvalidate = g.ids.filter((id) => id !== keep);
       conflicts.push({ type: g.type, tags: g.tags, ids: g.ids, keep, toInvalidate });
     }
   }
 
-  // Supersession chains: invalid === true && superseded_by set.
+  // Supersession chains: inactive records with superseded_by set
+  // (includes legacy rows with invalid: false and a replacement link).
   const chains = [];
   for (const rec of list) {
-    if (rec && rec.invalid === true && rec.superseded_by) {
+    if (rec && !isActive(rec) && rec.superseded_by) {
       chains.push({ id: rec.id, superseded_by: rec.superseded_by });
     }
   }

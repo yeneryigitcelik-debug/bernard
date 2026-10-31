@@ -132,6 +132,28 @@ bernard list --type decision
 bernard list --tag auth
 ```
 
+The list includes history and marks invalid records and their replacement IDs.
+Search/list type filters reject unknown types with the valid choices instead of
+silently returning an empty result. Tags keep their exact-match behavior.
+
+### Inspect a full record
+
+```bash
+bernard show <record-id>
+bernard show <record-id> --json
+bernard goster <record-id> --json --locale tr
+```
+
+Use the exact ID from search or list to read the complete content. `show --json`
+prints only the full stored record, including unknown fields, `invalid`, and
+`superseded_by`; search and list remain compact views. Inspection includes history,
+so check its state before using a record as current context or updating it.
+It never creates a missing store, rebuilds the cache or changes record bytes.
+
+Differing copies of an ID cannot be inspected as one exact record, even when a
+copy is invalid. Run `bernard doctor` and reconcile the reported lines manually.
+Identical copies can be inspected; no copy is repaired or deleted.
+
 ### Invalidate (supersede)
 
 ```bash
@@ -139,7 +161,9 @@ bernard invalidate ber_abc123
 bernard invalidate ber_abc123 --by ber_def456
 ```
 
-Marks a record invalid **without deleting it** (`invalid: true`). `--by` links the record that replaces it, preserving the decision history. Search drops invalid records by default.
+Marks a record invalid **without deleting it** (`invalid: true`). `--by` links the record that replaces it, preserving the decision history. Search drops invalid records by default. Retrying invalidation without `--by` preserves any existing replacement link.
+
+A non-empty `superseded_by` link also makes a row historical, even if an older or merged row still has `invalid: false`. Search excludes it, while full inspection and the default history list retain the complete row and replacement target. Distill shows that existing edge but never proposes the replaced row as the current keeper. These reads do not repair flags or rewrite records; use `doctor` to diagnose inconsistent stored data.
 
 To record a new decision that directly supersedes an old one:
 
@@ -156,7 +180,27 @@ bernard distill
 bernard distill --apply
 ```
 
-Surfaces possible conflicts (multiple records with the same type + tags), supersession chains, and suggestions. For each conflict it proposes **keep the newest, invalidate the rest** and prints ready-to-run `bernard invalidate … --by …` commands. `--apply` (TTY) applies them interactively. **It never deletes anything** — it only marks and suggests.
+Surfaces possible conflicts (multiple tagged records with the same type + tags), supersession chains, and suggestions. Untagged records and separate `bug` events are excluded from conflict proposals; sharing a type or tag is not proof of contradiction. For each conflict it proposes **keep the newest, invalidate the rest** and prints ready-to-run `bernard invalidate … --by …` commands. `--apply` (TTY) applies them interactively. **It never deletes anything** — it only marks and suggests.
+
+Interactive apply checks that the records still match the displayed plan under the writer lock. Any external change, including an unrelated append, stops the remaining session with an error asking you to rerun `bernard distill`. Earlier confirmed changes remain committed and are counted in the final summary; the refused step writes nothing. The lock is released while you decide. This guards cooperating Bernard writers, not programs that bypass the store lock. Explicit `bernard invalidate` commands retain their existing behavior.
+
+### Check integrity (read-only)
+
+```bash
+bernard doctor
+bernard doctor --json
+bernard doktor --locale tr
+```
+
+Checks source lines, duplicate IDs, supersession links/cycles, settings, categories,
+Git ignore/merge rules, tracked caches, cache freshness, locks and hook ownership.
+It never repairs records, acquires/removes a lock, creates a store or rebuilds a cache.
+JSON output has `schema: 1`, a `summary`, stable English diagnostic `id`s, localized
+messages, line numbers and an `exitCode`. Exit status: **0** healthy (information only),
+**1** warnings, **2** data/layout errors, **3** root unavailable. `summary.records`
+counts valid physical rows; `unique_ids` and `quarantined_ids` make duplicates explicit.
+For a duplicate, inspect the reported lines and reconcile the history manually, then
+run `doctor` again. There is no automatic repair or deletion.
 
 ### Stats
 
@@ -174,7 +218,7 @@ bernard tags --add "auth=login,session"
 bernard tags --remove "auth"
 ```
 
-Lists/edits the types and synonym groups in `categories.json`. Synonyms power query expansion at search time, so the team's vocabulary becomes the team's recall.
+Lists/edits the types and synonym groups in `categories.json`. Fresh projects must run `init` before editing tags; existing standalone categories files remain editable for compatibility. Synonyms power query expansion at search time, so the team's vocabulary becomes the team's recall.
 
 ### Suggest (draft from commits)
 
@@ -196,7 +240,7 @@ Installs a marked, idempotent `.git/hooks/post-commit` reminder to run `bernard 
 
 ## MCP integration (the main path)
 
-bernard's real power is connecting to an AI agent. As an **MCP server** it exposes six tools that an agent uses automatically — searching prior decisions before it starts, recording new ones, and invalidating stale ones.
+bernard's real power is connecting to an AI agent. As an **MCP server** it exposes seven tools that an agent uses automatically — searching prior decisions before it starts, recording new ones, and invalidating stale ones.
 
 Add to your project's `.mcp.json`:
 
@@ -230,7 +274,8 @@ The server exposes:
 |------|--------------|
 | **`bernard_search`** | Search past decisions, architecture notes, fixed bugs, and preferences. The key tool — the agent calls it before starting work. |
 | **`bernard_add`** | Add a new record (`source: "agent"`); validates the schema before writing. |
-| **`bernard_list`** | List records, optionally filtered by type/tag. |
+| **`bernard_list`** | List records with visible state and replacement IDs, optionally filtered by type/tag. History is included by default; `include_invalid: false` excludes invalid or replacement-linked records. |
+| **`bernard_get`** | Inspect one exact `id` as full JSON, including historical state and every stored field. Read-only; differing duplicate copies require manual reconciliation. |
 | **`bernard_invalidate`** | Invalidate a record (`id`, optional `by`). Marks, never deletes. |
 | **`bernard_update`** | Update fields of an existing record; only provided fields change. |
 | **`bernard_suggest`** | Fetch recent commits + diffs so the agent can extract records worth keeping. |
@@ -281,6 +326,19 @@ bernard never deletes knowledge; it **invalidates** stale decisions and preserve
 
 Because each record is an independent line in an append-mostly file, git **unions** both sides when two branches add different records — so teammates writing to memory at the same time don't hit needless merge conflicts.
 
+Updating a line on one branch while another branch appends nearby can also produce
+**duplicate IDs**. Bernard keeps all source bytes and reports their line numbers:
+identical copies count once; if any copy is invalid, the ID stays excluded from search.
+When different copies are all active, that ID is **quarantined from search, list,
+stats and distill** rather than choosing a branch's content arbitrarily. CLI reads
+warn on stderr; MCP search/list include the diagnostic in the tool response.
+Updates to conflicting copies fail with an actionable `doctor` hint; unrelated
+records remain usable. An explicit patch to identical copies updates each copy while
+preserving its line ending. Run `bernard doctor` and reconcile duplicate lines by hand;
+no read silently rewrites or removes them. Search cache format 3 invalidates older
+indexes even when the JSONL fingerprint is unchanged.
+
+
 ## Architecture: what's committed, what's local
 
 ```
@@ -298,6 +356,10 @@ your-project/
 ```
 
 **Committed:** `records.jsonl`, `categories.json`, `config.json`. Memory is code — it should be shared, reviewed, and versioned with git history.
+
+**Initialization:** Read commands do not create missing stores. MCP writes require an existing records file; launch the server in the intended project root and run `bernard init` there first. CLI `add` retains its older auto-create behavior with a warning to run `init` for configuration and Git rules.
+
+**Local writes:** CLI and MCP writers in the same working copy share a lock and replace JSONL atomically. A CLI `add --supersedes` appends the replacement and invalidates the old record in one locked, atomic write. Concurrent writers wait for a bounded interval; an active lock is never stolen. This does not coordinate separate computers or resolve Git merge conflicts. Malformed or invalid rows are skipped for retrieval and preserved on disk for manual repair.
 
 **Local:** `.bernard/.cache/`. The BM25 `index.json` is fully derivable from `records.jsonl` (rebuilt automatically when the records change, or when the locale changes). Committing derived data would only create meaningless conflicts.
 
@@ -350,10 +412,10 @@ Retrieval is locale-aware too: Turkish gets a conservative stemmer (so `tokenlar
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). The project is intentionally dependency-light (only the MCP SDK + zod for the server) and ships a zero-dependency smoke test:
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). The project is intentionally dependency-light (only the MCP SDK + zod for the server) and ships an offline smoke suite plus storage, retrieval, hook and real MCP protocol regressions:
 
 ```bash
-npm install
+npm ci
 npm test
 ```
 

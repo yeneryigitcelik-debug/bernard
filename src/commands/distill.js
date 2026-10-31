@@ -3,9 +3,12 @@
 
 import readline from "node:readline";
 import { findRepoRoot, bernardDir } from "../core/paths.js";
-import { readRecords, updateRecord } from "../core/store.js";
+import { readSnapshot, updateRecord } from "../core/store.js";
 import { distill } from "../core/distill.js";
 import { getT } from "../i18n/index.js";
+import { log } from "../util/log.js";
+
+const EXPECTED_CODES = new Set(["EBERNARD_INVALID_RECORD", "EBERNARD_LOCK_TIMEOUT"]);
 
 function ask(rl, q) {
   return new Promise((resolve) => rl.question(q, resolve));
@@ -19,7 +22,9 @@ function isYes(answer) {
 export async function distillCmd(parsed) {
   const dir = bernardDir(findRepoRoot());
   const t = getT(dir);
-  const records = readRecords(dir);
+  const snapshot = readSnapshot(dir);
+  const records = snapshot.records;
+  let fingerprint = snapshot.fingerprint;
 
   const { conflicts, chains } = distill(records);
 
@@ -88,6 +93,7 @@ export async function distillCmd(parsed) {
   const applyRequested = parsed?.flags?.apply;
   const applicable = conflicts.filter((c) => c.keep && c.toInvalidate.length > 0);
 
+  if (applyRequested && !process.stdin.isTTY) console.log(t("distill.ttyHint"));
   if (!applyRequested || !process.stdin.isTTY) {
     if (applicable.length) {
       console.log("");
@@ -123,11 +129,28 @@ export async function distillCmd(parsed) {
       const answer = await ask(rl, t("distill.applyPrompt"));
       if (isYes(answer)) {
         for (const old of c.toInvalidate) {
-          const u = updateRecord(dir, old, { invalid: true, superseded_by: c.keep });
-          if (u) {
-            total++;
-            console.log(`  ${t("distill.applied", { old, keep: c.keep })}`);
+          let u = null;
+          try {
+            u = updateRecord(dir, old, { invalid: true, superseded_by: c.keep }, { expectedFingerprint: fingerprint });
+          } catch (err) {
+            if (err && err.code === "EBERNARD_STALE_PLAN") {
+              log.error(String(err.message));
+              process.exitCode = 1;
+              return;
+            }
+            if (!err || !EXPECTED_CODES.has(err.code)) throw err;
+            log.error(String(err.message));
+            process.exitCode = 1;
+            continue;
           }
+          if (!u) {
+            log.error(t("store.stalePlan"));
+            process.exitCode = 1;
+            return;
+          }
+          fingerprint = u.fingerprint;
+          total++;
+          console.log(`  ${t("distill.applied", { old, keep: c.keep })}`);
         }
       } else {
         console.log(`  ${t("distill.skipped")}`);
@@ -135,8 +158,7 @@ export async function distillCmd(parsed) {
     }
   } finally {
     rl.close();
+    console.log("");
+    console.log(t("distill.completed", { n: total }));
   }
-
-  console.log("");
-  console.log(t("distill.completed", { n: total }));
 }

@@ -3,6 +3,82 @@
 // Keep this file and tr.js in sync, key-for-key.
 
 export const en = {
+  "inspect.usage": "Usage: bernard show <id> [--json] (exactly one record ID is required).",
+  "inspect.jsonNoValue": "--json does not take a value.",
+  "inspect.notInitialized": "No bernard store found at {dir}. Run `bernard init` first.",
+  "inspect.notFound": "Record not found: {id}",
+  "inspect.ambiguous": "Record ID {id} has conflicting copies on lines {lines}. Run `bernard doctor` to resolve them before inspecting.",
+  "inspect.state": "state: {state}",
+  "inspect.stateActive": "active",
+  "inspect.stateInvalid": "invalid",
+  "inspect.stateReplaced": "replacement linked",
+  "inspect.replacement": "replaced by: {id}",
+  "inspect.source": "source: {source}",
+  "mcp.get.desc": "Fetch one record by exact ID as full JSON, including history (invalidated or replaced records keep their invalid/superseded_by fields). Use it to inspect a record before updating or invalidating it. This is not a search.",
+  "mcp.list.includeInvalid": "Default true (history included). Set false to return only active records, excluding invalid or replacement-linked history.",
+  "doctor.layout.root_unreadable": "Cannot inspect root {path}: {error}",
+  "doctor.layout.unreadable": "Cannot read {path}: {error}",
+  "doctor.layout.missing_dir": "Memory is not initialized at {path}; run bernard init in the intended project root.",
+  "doctor.layout.missing_file": "Missing memory file: {file}.",
+  "doctor.layout.gitignore_cache": "The local .bernard/.cache directory is not explicitly ignored.",
+  "doctor.layout.gitattributes_union": "The records.jsonl merge=union Git attribute is missing.",
+  "doctor.layout.cache_tracked": "Derived cache files are tracked by Git.",
+  "doctor.records.invalid_utf8": "Line {lineNo} contains invalid UTF-8. Original bytes were preserved.",
+  "doctor.records.corrupt_json": "Line {lineNo} is not valid JSON.",
+  "doctor.records.schema_invalid": "Line {lineNo} fails record validation: {errors}",
+  "doctor.records.duplicate_id": "ID {id} occurs on lines {lineNos}. Invalid copies stay excluded; conflicting active copies are quarantined.",
+  "doctor.records.no_trailing_newline": "The last line has no terminating newline.",
+  "doctor.records.mixed_eol": "The file mixes LF and CRLF endings; existing bytes were preserved.",
+  "doctor.graph.superseded_by_missing": "Line {lineNo}: {id} points to missing record {by}.",
+  "doctor.graph.superseded_by_self": "Line {lineNo}: {id} supersedes itself.",
+  "doctor.graph.cycle": "Supersession cycle: {ids}",
+  "doctor.graph.valid_but_superseded": "Line {lineNo}: {id} has a replacement but is still marked valid.",
+  "doctor.config.unparseable": "config.json is not a valid settings object.",
+  "doctor.config.locale_unknown": "Unknown configured locale: {locale}",
+  "doctor.config.retrieval_range": "Invalid retrieval settings: {fields}",
+  "doctor.categories.unparseable": "categories.json is not a valid object.",
+  "doctor.categories.types_diverge": "Categories must contain each canonical record type exactly once.",
+  "doctor.categories.synonyms_shape": "Synonyms must map keys to arrays of strings.",
+  "doctor.cache.version_mismatch": "Cache format {actual} is obsolete; current format is {expected}.",
+  "doctor.cache.stale": "The search cache is absent or stale; doctor did not rebuild it.",
+  "doctor.lock.present": "A store lock exists at {path}; owner state: {state}. It was not removed.",
+  "doctor.lock.breaker_present": "A stale-lock breaker exists at {path}; it was not removed.",
+  "doctor.hook.state": "Post-commit hook state: {kind}",
+  "doctor.reconcile": "Inspect lines {lines}, reconcile their history manually, then run bernard doctor again. No automatic repair is performed.",
+  "doctor.summary": "{errors} errors, {warnings} warnings, {infos} infos; {records} valid rows, {unique_ids} unique IDs, {quarantined_ids} quarantined IDs.",
+
+  "store.duplicateLines": "Duplicate id \"{id}\" on lines {lines}; conflicting active copies are excluded from reads. Run bernard doctor and reconcile these lines manually.",
+  "store.ambiguousUpdate": "Cannot update conflicting copies of \"{id}\". Run bernard doctor, reconcile the reported lines manually, then retry. Original bytes are unchanged.",
+  "cli.flagNeedsValue": "Flag {flag} requires a non-empty value.",
+  "mcp.notInitialized": "Memory is not initialized at {dir}. Run bernard init in the intended project root before writing. No files were created.",
+  "add.notInitialized": "Memory settings are missing at {dir}; CLI add keeps its legacy auto-create behavior. Run bernard init to add config, categories and Git ignore/merge rules.",
+  "distill.ttyHint": "--apply requires an interactive terminal; no records were changed.",
+  "tags.unreadable": "Cannot safely edit/read {path}: {error}. Fix the file manually; existing categories were preserved.",
+
+  // Storage validation and concurrency diagnostics.
+  "store.invalidRecord": "Invalid record: {errors}",
+  "store.invalidFingerprint": "Invalid expected fingerprint: it must be a canonical records fingerprint.",
+  "store.stalePlan": "Records changed while the plan was waiting. Nothing was applied from this step; re-run bernard distill.",
+  "store.invalidLine": "Skipping invalid record line: {line} ({errors})",
+  "store.invalidUtf8": "Skipping line with invalid UTF-8 ({bytes} bytes); original bytes are preserved.",
+  "store.duplicateId": "A record with id \"{id}\" already exists.",
+  "store.patchNotObject": "Patch must be an object.",
+  "store.idImmutable": "The record id cannot be changed.",
+  "store.supersedeSelf": "Record \"{id}\" cannot supersede itself.",
+  "store.supersedeMissing": "Superseding record \"{id}\" does not exist.",
+  "store.supersedeCycle": "Superseding \"{id}\" with \"{by}\" would create a cycle.",
+  "store.lockOwnerUnknown": "unknown owner",
+  "store.lockTimeout": "Timed out after {ms} ms waiting for store lock {path} (held by {owner}).",
+  "store.lockGarbled": "Timed out after {ms} ms: lock file {path} has unreadable content and no identifiable owner. If no bernard process is running, delete {path} manually.",
+  "store.lockBreakerStuck": "Timed out after {ms} ms: stale-lock breaker {path} exists (held by {owner}). It is never removed automatically. If no bernard process is running, delete {path} (and {lock} if its owner is dead) manually.",
+  "store.lockLost": "Store lock {path} was no longer ours at release time.",
+  "schema.idRequired": "Id is required and must be a non-empty string.",
+  "schema.createdInvalid": "Created must be a valid date string.",
+  "schema.invalidBoolean": "Invalid must be a boolean.",
+  "schema.supersededByInvalid": "superseded_by must be null or a non-empty string.",
+  "schema.sourceString": "Source must be a string.",
+  "store.indexWriteFailed": "Could not write the local search index: {error}",
+
   // --- common ---
   "common.noGitRepo": "Git repository not found; using the current directory.",
   "common.corruptLine": "Skipped corrupt line: {line}",
@@ -202,10 +278,12 @@ Commands:
   add        (alias: ekle)      Add a new memory record
   search     (alias: ara)       Search records (BM25 full-text retrieval)
   list       (alias: listele)   List records (newest first)
+  show       (alias: goster)    Inspect one full record by exact ID [--json]
   invalidate (alias: gecersiz)  Mark a record invalid (does not delete)
   distill    (alias: damit)     Surface conflicts / supersession chains
   suggest    (alias: oner)      Draft records from recent commits
   install-hook (alias: kanca-kur)  Install/remove a post-commit reminder hook
+  doctor (doktor)              Read-only integrity check [--json]; exits 0 healthy, 1 warning, 2 error, 3 unavailable
   stats      (alias: istatistik)   Show a summary dashboard
   tags       (alias: etiketler)    Manage types / synonym groups
   mcp                           Start the MCP server (stdio)
@@ -234,6 +312,7 @@ Examples:
   bernard invalidate ber_abc123 --by ber_def456
   bernard distill --apply
   bernard suggest --add
+  bernard doctor --json
   bernard stats
   bernard tags --add "auth=login,session"
   bernard install-hook
