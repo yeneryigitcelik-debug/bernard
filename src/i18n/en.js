@@ -57,6 +57,8 @@ export const en = {
 
   // Storage validation and concurrency diagnostics.
   "store.invalidRecord": "Invalid record: {errors}",
+  "store.invalidFingerprint": "Invalid expected fingerprint: it must be a canonical records fingerprint.",
+  "store.stalePlan": "Records changed while the plan was waiting. Nothing was applied from this step; re-run bernard distill.",
   "store.invalidLine": "Skipping invalid record line: {line} ({errors})",
   "store.invalidUtf8": "Skipping line with invalid UTF-8 ({bytes} bytes); original bytes are preserved.",
   "store.duplicateId": "A record with id \"{id}\" already exists.",

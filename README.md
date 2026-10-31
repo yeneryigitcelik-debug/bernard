@@ -182,6 +182,8 @@ bernard distill --apply
 
 Surfaces possible conflicts (multiple tagged records with the same type + tags), supersession chains, and suggestions. Untagged records and separate `bug` events are excluded from conflict proposals; sharing a type or tag is not proof of contradiction. For each conflict it proposes **keep the newest, invalidate the rest** and prints ready-to-run `bernard invalidate … --by …` commands. `--apply` (TTY) applies them interactively. **It never deletes anything** — it only marks and suggests.
 
+Interactive apply checks that the records still match the displayed plan under the writer lock. Any external change, including an unrelated append, stops the remaining session with an error asking you to rerun `bernard distill`. Earlier confirmed changes remain committed and are counted in the final summary; the refused step writes nothing. The lock is released while you decide. This guards cooperating Bernard writers, not programs that bypass the store lock. Explicit `bernard invalidate` commands retain their existing behavior.
+
 ### Check integrity (read-only)
 
 ```bash

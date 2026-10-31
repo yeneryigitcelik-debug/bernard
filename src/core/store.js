@@ -565,6 +565,9 @@ export function appendSuperseding(dir, record, oldId, opts = {}) {
 
 // Update a record in place. Unrelated lines (including malformed ones) keep
 // their exact original bytes. Validates the full candidate under the lock.
+// Checked callers receive the committed record and exact byte fingerprint.
+// The precondition shares the cooperating writer lock; it is not filesystem CAS
+// against programs that ignore that lock. Legacy callers still get the record.
 export function updateRecord(dir, id, patch, opts = {}) {
   const t = getT(dir);
   if (patch === null || typeof patch !== "object" || Array.isArray(patch)) {
@@ -577,6 +580,12 @@ export function updateRecord(dir, id, patch, opts = {}) {
   if (Object.hasOwn(clean, "id") && clean.id !== id) {
     throw invalidRecordError(t, [t("store.idImmutable")]);
   }
+  const checked = opts != null && Object.hasOwn(opts, "expectedFingerprint");
+  const expected = checked ? opts.expectedFingerprint : undefined;
+  if (checked) {
+    const m = typeof expected === "string" ? /^sha256:[a-f0-9]{64}:(0|[1-9][0-9]*)$/.exec(expected) : null;
+    if (!m || !Number.isSafeInteger(Number(m[1]))) throw invalidRecordError(t, [t("store.invalidFingerprint")]);
+  }
   if (typeof id !== "string" || !id) return null;
 
   return withStoreLock(
@@ -584,6 +593,11 @@ export function updateRecord(dir, id, patch, opts = {}) {
     () => {
       const file = recordsPath(dir);
       const buf = readRawRecords(dir);
+      if (checked && fingerprintBuffer(buf) !== expected) {
+        const err = new Error(t("store.stalePlan"));
+        err.code = "EBERNARD_STALE_PLAN";
+        throw err;
+      }
       const { lines, records, duplicates } = parseLines(buf, t, false);
       if (duplicates.some((d) => d.id === id && !d.identical)) {
         throw invalidRecordError(t, [t("store.ambiguousUpdate", { id })]);
@@ -610,8 +624,9 @@ export function updateRecord(dir, id, patch, opts = {}) {
       const parts = lines.map((l) =>
         l.rec && l.rec.id === id ? Buffer.from(JSON.stringify(candidate) + eolOf(l.seg), "utf8") : l.seg
       );
-      writeFileAtomic(file, Buffer.concat(parts), { tmpDir: storeCacheDir(dir) });
-      return candidate;
+      const nextBuf = Buffer.concat(parts);
+      writeFileAtomic(file, nextBuf, { tmpDir: storeCacheDir(dir) });
+      return checked ? { record: candidate, fingerprint: fingerprintBuffer(nextBuf) } : candidate;
     },
     opts
   );

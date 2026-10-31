@@ -58,6 +58,8 @@ export const tr = {
 
   // Storage validation and concurrency diagnostics.
   "store.invalidRecord": "Geçersiz kayıt: {errors}",
+  "store.invalidFingerprint": "Geçersiz beklenen parmak izi: kanonik bir kayıt parmak izi olmalıdır.",
+  "store.stalePlan": "Plan beklerken kayıtlar değişti. Bu adımdan hiçbir şey uygulanmadı; bernard distill komutunu yeniden çalıştırın.",
   "store.invalidLine": "Geçersiz kayıt satırı atlanıyor: {line} ({errors})",
   "store.invalidUtf8": "Geçersiz UTF-8 içeren satır atlanıyor ({bytes} bayt); orijinal baytlar korunuyor.",
   "store.duplicateId": "\"{id}\" kimlikli bir kayıt zaten var.",

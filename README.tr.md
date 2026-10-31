@@ -184,6 +184,8 @@ bernard distill --apply
 
 Olası çelişkileri (aynı tip + boş olmayan etiket grubunda birden çok kayıt), geçersiz zincirlerini ve önerileri gösterir. Etiketsiz kayıtlar ve ayrı `bug` olayları çakışma önerilerinden hariç tutulur; ortak tür/etiket tek başına çelişki kanıtı değildir. Her çelişki için **en yenisini tut, diğerlerini geçersiz kıl** önerir ve çalıştırmaya hazır `bernard invalidate … --by …` komutları üretir. `--apply` (TTY) bunları etkileşimli uygular. **Hiçbir şeyi silmez** — yalnızca işaretler ve önerir.
 
+Etkileşimli uygulama, kayıtların gösterilen planla hâlâ eşleştiğini yazma kilidi altında denetler. İlgisiz bir kayıt eklenmesi dahil dışarıdan yapılan herhangi bir değişiklik, kalan oturumu durdurur ve `bernard distill` komutunu yeniden çalıştırmanızı ister. Daha önce onaylanıp kaydedilmiş değişiklikler korunur ve sonuç özetinde doğru sayılır; reddedilen adım hiçbir şey yazmaz. Siz karar verirken kilit tutulmaz. Bu kontrol Bernard'ın ortak yazma kilidini kullanan işlemler içindir; kilidi atlayan programlara karşı dosya sistemi garantisi değildir. Doğrudan `bernard invalidate` komutlarının mevcut davranışı korunur.
+
 ### Bütünlük kontrolü (salt okunur)
 
 ```bash
